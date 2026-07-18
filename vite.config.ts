@@ -2,7 +2,7 @@ import { defineConfig } from "vite-plus";
 
 export default defineConfig({
   pack: {
-    entry: ["src/cli.ts"],
+    entry: ["src/cli.tsx"],
     format: ["esm"],
     minify: false,
     sourcemap: true,

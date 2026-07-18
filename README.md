@@ -6,7 +6,7 @@ npx farpoint-cli
 
 ## Development
 
-Farpoint uses Node.js 24 and the Vite+ toolchain.
+Farpoint uses Node.js and the Vite+ toolchain.
 
 ```bash
 pnpm install
