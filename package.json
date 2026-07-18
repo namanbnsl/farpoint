@@ -2,7 +2,15 @@
   "name": "farpoint-cli",
   "version": "0.0.1",
   "description": "Farpoint",
+  "homepage": "https://github.com/namanbnsl/farpoint#readme",
+  "bugs": {
+    "url": "https://github.com/namanbnsl/farpoint/issues"
+  },
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/namanbnsl/farpoint.git"
+  },
   "bin": {
     "farpoint": "./dist/cli.mjs"
   },
