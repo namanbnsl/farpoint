@@ -1,0 +1,35 @@
+{
+  "name": "farpoint-cli",
+  "version": "0.0.1",
+  "description": "Farpoint",
+  "license": "MIT",
+  "bin": {
+    "farpoint": "./dist/cli.mjs"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "vp pack",
+    "check": "vp check",
+    "dev": "vp pack --watch",
+    "start": "node dist/cli.mjs",
+    "prepack": "pnpm build",
+    "pack:dry": "pnpm pack --dry-run"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "typescript": "5.9.3",
+    "vite-plus": "0.2.5"
+  },
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "packageManager": "pnpm@10.33.2"
+}
