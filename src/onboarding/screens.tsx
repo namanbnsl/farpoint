@@ -247,32 +247,3 @@ export function ModelListScreen({
     </Shell>
   );
 }
-
-export type HelloScreenProps = {
-  model: Model<Api> | undefined;
-  reply: string;
-  status: "sending" | "done" | "error";
-  error: string;
-};
-
-export function HelloScreen({ model, reply, status, error }: HelloScreenProps) {
-  return (
-    <Shell stage="hello">
-      <Text color={theme.muted}>
-        {model?.name} · {model?.provider}
-      </Text>
-      <Box marginTop={1} flexDirection="column">
-        <Text>
-          <Text color={theme.accent}>you </Text>
-          Hello.
-        </Text>
-        <Box marginTop={1}>
-          <Text color={theme.success}>farpoint </Text>
-          {status === "sending" && !reply ? <Spinner label="Thinking…" /> : <Text>{reply}</Text>}
-        </Box>
-      </Box>
-      {error ? <Text color={theme.danger}>{error}</Text> : null}
-      {status !== "sending" ? <Hint>enter finish · r retry · esc models</Hint> : null}
-    </Shell>
-  );
-}

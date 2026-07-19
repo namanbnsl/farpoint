@@ -1,12 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Api, Model } from "@earendil-works/pi-ai";
 import { useApp, useInput } from "ink";
-import {
-  createOAuthInteraction,
-  credentialStore,
-  modelRegistry,
-  streamGreeting,
-} from "./ai/client";
+import { createOAuthInteraction, credentialStore, modelRegistry } from "./ai/client";
 import {
   buildProviderOptions,
   filterModels,
@@ -20,7 +15,6 @@ import { messageFromError } from "./errors";
 import {
   ApiKeyScreen,
   AuthMethodScreen,
-  HelloScreen,
   ModelListScreen,
   OAuthScreen,
   ProviderListScreen,
@@ -30,18 +24,9 @@ import { copyToClipboard } from "./terminal";
 import { getSelectionWindow, moveSelection } from "./ui/selection";
 import { updateTextInput } from "./ui/text-input";
 
-type OnboardingScreen =
-  | "welcome"
-  | "providers"
-  | "auth-method"
-  | "api-key"
-  | "oauth"
-  | "model"
-  | "hello";
+type OnboardingScreen = "welcome" | "providers" | "auth-method" | "api-key" | "oauth" | "model";
 
-type HelloStatus = "sending" | "done" | "error";
-
-export function Onboarding() {
+export function Onboarding({ onComplete }: { onComplete: (model: Model<Api>) => void }) {
   const { exit } = useApp();
   const [screen, setScreen] = useState<OnboardingScreen>("welcome");
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -56,9 +41,6 @@ export function Onboarding() {
   const [availableModels, setAvailableModels] = useState<Model<Api>[]>([]);
   const [providerQuery, setProviderQuery] = useState("");
   const [modelQuery, setModelQuery] = useState("");
-  const [chosenModel, setChosenModel] = useState<Model<Api>>();
-  const [helloReply, setHelloReply] = useState("");
-  const [helloStatus, setHelloStatus] = useState<HelloStatus>("sending");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const promptResolver = useRef<((value: string) => void) | undefined>(undefined);
@@ -186,28 +168,6 @@ export function Onboarding() {
       setError(messageFromError(cause));
     }
   }, [activeProviderId, inputValue, refreshConnections, showModels]);
-
-  const sendHello = useCallback(async (model: Model<Api>) => {
-    setChosenModel(model);
-    setHelloReply("");
-    setHelloStatus("sending");
-    setError("");
-    setScreen("hello");
-    try {
-      const greetingError = await streamGreeting(model, (delta) => {
-        setHelloReply((current) => current + delta);
-      });
-      if (greetingError) {
-        setError(greetingError);
-        setHelloStatus("error");
-      } else {
-        setHelloStatus("done");
-      }
-    } catch (cause) {
-      setError(messageFromError(cause));
-      setHelloStatus("error");
-    }
-  }, []);
 
   const signOut = useCallback(
     async (provider: ProviderOption) => {
@@ -392,7 +352,7 @@ export function Onboarding() {
       }
       if (key.return) {
         const model = visibleModels[selectedIndex];
-        if (model) void sendHello(model);
+        if (model) onComplete(model);
         return;
       }
       const updatedQuery = updateTextInput(modelQuery, input, key);
@@ -401,17 +361,6 @@ export function Onboarding() {
         setSelectedIndex(0);
       }
       return;
-    }
-
-    if (screen === "hello" && helloStatus !== "sending") {
-      if (key.escape) {
-        setSelectedIndex(0);
-        setScreen("model");
-      } else if (input.toLowerCase() === "r" && chosenModel) {
-        void sendHello(chosenModel);
-      } else if (key.return || input === "q") {
-        exit();
-      }
     }
   });
 
@@ -458,10 +407,6 @@ export function Onboarding() {
           filteredCount={visibleModels.length}
           totalCount={availableModels.length}
         />
-      );
-    case "hello":
-      return (
-        <HelloScreen model={chosenModel} reply={helloReply} status={helloStatus} error={error} />
       );
   }
 }

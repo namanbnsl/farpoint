@@ -1,7 +1,8 @@
 import { Agent } from "@earendil-works/pi-agent-core";
 import type { Api, AuthInteraction, Model } from "@earendil-works/pi-ai";
 import { builtinModels } from "@earendil-works/pi-ai/providers/all";
-import { createCredentialStore } from "../auth/credential-store.js";
+import { createCredentialStore } from "../auth/credential-store";
+import { sampleTool } from "./sample-tool";
 
 export const credentialStore = createCredentialStore();
 export const modelRegistry = builtinModels({ credentials: credentialStore });
@@ -46,16 +47,17 @@ export function createOAuthInteraction({
   };
 }
 
-export async function streamGreeting(
+export async function runSession(
   model: Model<Api>,
   onText: (delta: string) => void,
+  onToolCall?: (toolName: string) => void,
 ): Promise<string | undefined> {
   const agent = new Agent({
     initialState: {
-      systemPrompt: "You are the model connected to Farpoint. Be warm, direct, and concise.",
+      systemPrompt: "Call sample_tool once, then briefly report its result.",
       model,
       thinkingLevel: "off",
-      tools: [],
+      tools: [sampleTool],
       messages: [],
     },
     streamFn: (activeModel, context, options) =>
@@ -64,6 +66,10 @@ export async function streamGreeting(
 
   let errorMessage: string | undefined;
   agent.subscribe((event) => {
+    if (event.type === "tool_execution_start") {
+      onToolCall?.(event.toolName);
+      return;
+    }
     if (event.type === "message_update") {
       const update = event.assistantMessageEvent;
       if (update.type === "text_delta") onText(update.delta);
@@ -78,6 +84,6 @@ export async function streamGreeting(
     }
   });
 
-  await agent.prompt("Hello.");
+  await agent.prompt('Run the sample tool with the message "Hello from Farpoint".');
   return errorMessage;
 }

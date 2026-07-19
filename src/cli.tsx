@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
 import { render } from "ink";
-import { Onboarding } from "./onboarding";
+import { App } from "./app";
 
-render(<Onboarding />);
+render(<App />);
