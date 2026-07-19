@@ -2,7 +2,9 @@ import { Agent } from "@earendil-works/pi-agent-core";
 import type { Api, AuthInteraction, Model } from "@earendil-works/pi-ai";
 import { builtinModels } from "@earendil-works/pi-ai/providers/all";
 import { createCredentialStore } from "../auth/credential-store";
-import { sampleTool } from "./sample-tool";
+import { createAskUserTool, type RequestUserQuestion } from "./questions";
+import { initialRequest, systemPrompt } from "./system-prompt";
+import { createAnalysisTools, getToolLabel } from "./tools";
 
 export const credentialStore = createCredentialStore();
 export const modelRegistry = builtinModels({ credentials: credentialStore });
@@ -25,7 +27,9 @@ export function createOAuthInteraction({
     prompt: (prompt) => {
       if (prompt.type !== "select") return requestInput(prompt.message);
       const firstOption = prompt.options[0];
-      if (!firstOption) return Promise.reject(new Error("No sign-in method is available."));
+      if (!firstOption) {
+        return Promise.reject(new Error("No sign-in method is available."));
+      }
       return Promise.resolve(firstOption.id);
     },
     notify: (event) => {
@@ -50,14 +54,16 @@ export function createOAuthInteraction({
 export async function runSession(
   model: Model<Api>,
   onText: (delta: string) => void,
-  onToolCall?: (toolName: string) => void,
+  onActivity: (label: string) => void,
+  requestQuestion: RequestUserQuestion,
 ): Promise<string | undefined> {
+  const { tool: askUserTool, state: questionState } = createAskUserTool(requestQuestion);
   const agent = new Agent({
     initialState: {
-      systemPrompt: "Call sample_tool once, then briefly report its result.",
+      systemPrompt,
       model,
       thinkingLevel: "off",
-      tools: [sampleTool],
+      tools: [askUserTool, ...createAnalysisTools(questionState)],
       messages: [],
     },
     streamFn: (activeModel, context, options) =>
@@ -67,7 +73,7 @@ export async function runSession(
   let errorMessage: string | undefined;
   agent.subscribe((event) => {
     if (event.type === "tool_execution_start") {
-      onToolCall?.(event.toolName);
+      onActivity(getToolLabel(event.toolName));
       return;
     }
     if (event.type === "message_update") {
@@ -84,6 +90,6 @@ export async function runSession(
     }
   });
 
-  await agent.prompt('Run the sample tool with the message "Hello from Farpoint".');
+  await agent.prompt(initialRequest);
   return errorMessage;
 }

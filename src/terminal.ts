@@ -1,9 +1,5 @@
 import { spawn } from "node:child_process";
 
-export function terminalLink(label: string, url: string): string {
-  return `\u001B]8;;${url}\u0007${label}\u001B]8;;\u0007`;
-}
-
 function clipboardCommand(): { command: string; args: string[] } {
   if (process.platform === "darwin") return { command: "pbcopy", args: [] };
   if (process.platform === "win32" || process.env.WSL_DISTRO_NAME) {

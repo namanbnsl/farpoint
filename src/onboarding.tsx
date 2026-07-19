@@ -22,7 +22,6 @@ import {
 } from "./onboarding/screens";
 import { copyToClipboard } from "./terminal";
 import { getSelectionWindow, moveSelection } from "./ui/selection";
-import { updateTextInput } from "./ui/text-input";
 
 type OnboardingScreen = "welcome" | "providers" | "auth-method" | "api-key" | "oauth" | "model";
 
@@ -284,11 +283,6 @@ export function Onboarding({ onComplete }: { onComplete: (model: Model<Api>) => 
         if (provider) chooseProvider(provider);
         return;
       }
-      const updatedQuery = updateTextInput(providerQuery, input, key);
-      if (updatedQuery !== undefined) {
-        setProviderQuery(updatedQuery);
-        setSelectedIndex(0);
-      }
       return;
     }
 
@@ -324,8 +318,6 @@ export function Onboarding({ onComplete }: { onComplete: (model: Model<Api>) => 
         }
         return;
       }
-      const updatedValue = updateTextInput(inputValue, input, key);
-      if (updatedValue !== undefined) setInputValue(updatedValue);
       return;
     }
 
@@ -355,11 +347,6 @@ export function Onboarding({ onComplete }: { onComplete: (model: Model<Api>) => 
         if (model) onComplete(model);
         return;
       }
-      const updatedQuery = updateTextInput(modelQuery, input, key);
-      if (updatedQuery !== undefined) {
-        setModelQuery(updatedQuery);
-        setSelectedIndex(0);
-      }
       return;
     }
   });
@@ -379,12 +366,23 @@ export function Onboarding({ onComplete }: { onComplete: (model: Model<Api>) => 
           error={error}
           notice={notice}
           credentialPath={authPath}
+          onQueryChange={(value) => {
+            setProviderQuery(value);
+            setSelectedIndex(0);
+          }}
         />
       );
     case "auth-method":
       return <AuthMethodScreen provider={activeProvider} selectedIndex={selectedIndex} />;
     case "api-key":
-      return <ApiKeyScreen providerName={activeProvider?.name} value={inputValue} error={error} />;
+      return (
+        <ApiKeyScreen
+          providerName={activeProvider?.name}
+          value={inputValue}
+          error={error}
+          onValueChange={setInputValue}
+        />
+      );
     case "oauth":
       return (
         <OAuthScreen
@@ -395,6 +393,7 @@ export function Onboarding({ onComplete }: { onComplete: (model: Model<Api>) => 
           inputValue={inputValue}
           error={error}
           clipboardStatus={clipboardStatus}
+          onInputChange={setInputValue}
         />
       );
     case "model":
@@ -406,6 +405,10 @@ export function Onboarding({ onComplete }: { onComplete: (model: Model<Api>) => 
           selectedIndex={selectedIndex - modelWindow.startIndex}
           filteredCount={visibleModels.length}
           totalCount={availableModels.length}
+          onQueryChange={(value) => {
+            setModelQuery(value);
+            setSelectedIndex(0);
+          }}
         />
       );
   }

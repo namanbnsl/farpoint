@@ -1,13 +1,18 @@
 import type { Api, Model } from "@earendil-works/pi-ai";
 import { Box, Text } from "ink";
+import BigText from "ink-big-text";
+import Gradient from "ink-gradient";
+import Link from "ink-link";
 import { authMethodOptions, type ProviderOption } from "../ai/providers.js";
-import { terminalLink } from "../terminal.js";
 import { Hint, InputField, ScreenHeading, Selector, Shell, Spinner } from "../ui/primitives.js";
 import { theme } from "../ui/theme.js";
 
 export function WelcomeScreen({ ready }: { ready: boolean }) {
   return (
-    <Shell stage="welcome" animateBrand>
+    <Shell stage="welcome" showHeader={false}>
+      <Gradient colors={[theme.accent, theme.code]}>
+        <BigText text="FARPOINT" font="tiny" />
+      </Gradient>
       <ScreenHeading>Understand how you work with coding agents.</ScreenHeading>
       <Box marginTop={3} flexDirection="column">
         <Text>
@@ -39,6 +44,7 @@ export type ProviderListScreenProps = {
   error: string;
   notice: string;
   credentialPath: string;
+  onQueryChange: (value: string) => void;
 };
 
 export function ProviderListScreen({
@@ -51,6 +57,7 @@ export function ProviderListScreen({
   error,
   notice,
   credentialPath,
+  onQueryChange,
 }: ProviderListScreenProps) {
   return (
     <Shell stage="connections">
@@ -67,7 +74,7 @@ export function ProviderListScreen({
           Use a subscription or API key. Adding one keeps your other saved providers.
         </Text>
       </Box>
-      <InputField value={query} placeholder="Search providers" icon="⌕" />
+      <InputField value={query} onChange={onQueryChange} placeholder="Search providers" icon="⌕" />
       {providers.length > 0 ? (
         <Selector
           options={providers.map((provider) => ({
@@ -122,10 +129,12 @@ export function ApiKeyScreen({
   providerName,
   value,
   error,
+  onValueChange,
 }: {
   providerName: string | undefined;
   value: string;
   error: string;
+  onValueChange: (value: string) => void;
 }) {
   return (
     <Shell stage="connect">
@@ -133,7 +142,7 @@ export function ApiKeyScreen({
       <Box marginTop={2}>
         <Text color={theme.muted}>Your key is stored locally.</Text>
       </Box>
-      <InputField value={value} placeholder="Paste API key" masked />
+      <InputField value={value} onChange={onValueChange} placeholder="Paste API key" masked />
       {error ? <Text color={theme.danger}>{error}</Text> : null}
       <Hint>enter save · esc back</Hint>
     </Shell>
@@ -148,6 +157,7 @@ export type OAuthScreenProps = {
   inputValue: string;
   error: string;
   clipboardStatus: string;
+  onInputChange: (value: string) => void;
 };
 
 export function OAuthScreen({
@@ -158,6 +168,7 @@ export function OAuthScreen({
   inputValue,
   error,
   clipboardStatus,
+  onInputChange,
 }: OAuthScreenProps) {
   return (
     <Shell stage="connect">
@@ -170,9 +181,11 @@ export function OAuthScreen({
             </Text>
             <Text>
               {"  "}
-              <Text color={theme.accent} underline>
-                {terminalLink("Open sign-in page ↗", url)}
-              </Text>
+              <Link url={url} fallback={false}>
+                <Text color={theme.accent} underline>
+                  Open sign-in page ↗
+                </Text>
+              </Link>
               <Text color={theme.muted}> · ctrl+l copy link</Text>
             </Text>
           </>
@@ -189,7 +202,11 @@ export function OAuthScreen({
       {prompt ? (
         <Box marginTop={2} flexDirection="column">
           <Text color={theme.muted}>{prompt}</Text>
-          <InputField value={inputValue} placeholder="Paste code or redirect URL" />
+          <InputField
+            value={inputValue}
+            onChange={onInputChange}
+            placeholder="Paste code or redirect URL"
+          />
         </Box>
       ) : null}
       <Hint>
@@ -206,6 +223,7 @@ export type ModelListScreenProps = {
   selectedIndex: number;
   filteredCount: number;
   totalCount: number;
+  onQueryChange: (value: string) => void;
 };
 
 export function ModelListScreen({
@@ -215,6 +233,7 @@ export function ModelListScreen({
   selectedIndex,
   filteredCount,
   totalCount,
+  onQueryChange,
 }: ModelListScreenProps) {
   return (
     <Shell stage="model">
@@ -226,7 +245,12 @@ export function ModelListScreen({
           Connected to {providerName} · {filteredCount} of {totalCount} models
         </Text>
       </Box>
-      <InputField value={query} placeholder="Search models by name" icon="⌕" />
+      <InputField
+        value={query}
+        onChange={onQueryChange}
+        placeholder="Search models by name"
+        icon="⌕"
+      />
       {models.length > 0 ? (
         <Selector
           selectedIndex={selectedIndex}
