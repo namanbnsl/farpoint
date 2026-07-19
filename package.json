@@ -32,6 +32,8 @@
     "pack:dry": "pnpm pack --dry-run"
   },
   "dependencies": {
+    "@earendil-works/pi-agent-core": "0.80.10",
+    "@earendil-works/pi-ai": "0.80.10",
     "ink": "7.1.1",
     "react": "19.2.7"
   },

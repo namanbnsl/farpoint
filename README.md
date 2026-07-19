@@ -13,9 +13,3 @@ pnpm install
 pnpm check
 pnpm build
 ```
-
-Inspect the exact npm artifact before publishing:
-
-```bash
-pnpm pack:dry
-```
