@@ -1,6 +1,8 @@
-import { Box, Text, useStdout } from "ink";
+import { Box, Text, useInput, useStdout } from "ink";
+import BigText from "ink-big-text";
+import Gradient from "ink-gradient";
 import InkSpinner from "ink-spinner";
-import TextInput from "ink-text-input";
+import { updateTextInput } from "./text-input.js";
 import { theme } from "./theme.js";
 
 export type SelectOption = {
@@ -8,31 +10,19 @@ export type SelectOption = {
   detail?: string;
 };
 
-export function Shell({
-  children,
-  stage,
-  showHeader = true,
-}: {
-  children: React.ReactNode;
-  stage: string;
-  showHeader?: boolean;
-}) {
+export function Shell({ children, stage }: { children: React.ReactNode; stage: string }) {
   const { stdout } = useStdout();
   const width = Math.min(104, Math.max(48, (stdout.columns ?? 100) - 2));
   return (
     <Box width={width} minHeight={28} flexDirection="column" paddingX={4} paddingY={3}>
-      {showHeader ? (
-        <Box>
-          <Box width={3}>
-            <Text color={theme.accent}>●</Text>
-          </Box>
-          <Text bold color={theme.accentBright}>
-            FARPOINT
-          </Text>
-          <Text color={theme.muted}> {stage}</Text>
-        </Box>
-      ) : null}
-      <Box marginTop={showHeader ? 4 : 0} flexDirection="column" flexGrow={1}>
+      <Gradient colors={[theme.accent, theme.code]}>
+        <BigText text="FARPOINT" font="tiny" />
+      </Gradient>
+      <Box marginTop={1}>
+        <Text color={theme.accent}>●</Text>
+        <Text color={theme.muted}> {stage}</Text>
+      </Box>
+      <Box marginTop={3} flexDirection="column" flexGrow={1}>
         {children}
       </Box>
     </Box>
@@ -99,18 +89,27 @@ export function InputField({
 }) {
   const { stdout } = useStdout();
   const width = Math.min(maxWidth, Math.max(46, (stdout.columns ?? 100) - 16));
+  useInput((input, key) => {
+    const nextValue = updateTextInput(value, input, key);
+    if (nextValue !== undefined && nextValue !== value) onChange(nextValue);
+  });
+  const displayValue = masked ? "•".repeat(value.length) : value;
   return (
     <Box marginTop={2} width={width} borderStyle="round" borderColor={theme.accent} paddingX={2}>
       <Box width={3}>
         <Text color={theme.accent}>{icon}</Text>
       </Box>
-      <TextInput
-        value={value}
-        onChange={onChange}
-        placeholder={placeholder}
-        mask={masked ? "•" : undefined}
-        highlightPastedText
-      />
+      {displayValue ? (
+        <Text>
+          {displayValue}
+          <Text inverse> </Text>
+        </Text>
+      ) : (
+        <Text color={theme.muted}>
+          {placeholder}
+          <Text inverse> </Text>
+        </Text>
+      )}
     </Box>
   );
 }

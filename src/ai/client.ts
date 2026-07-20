@@ -1,13 +1,20 @@
 import { Agent } from "@earendil-works/pi-agent-core";
 import type { Api, AuthInteraction, Model } from "@earendil-works/pi-ai";
 import { builtinModels } from "@earendil-works/pi-ai/providers/all";
+import {
+  beginAgentsViewAnalysis,
+  getAgentsViewAvailability,
+  installAgentsView,
+} from "../agentsview/runner";
 import { createCredentialStore } from "../auth/credential-store";
-import { createAskUserTool, type RequestUserQuestion } from "./questions";
-import { initialRequest, systemPrompt } from "./system-prompt";
-import { createAnalysisTools, getToolLabel } from "./tools";
+import { runFullCorpusAnalysis } from "../intelligence/coordinator";
+import type { RequestUserQuestion } from "./questions";
 
 export const credentialStore = createCredentialStore();
 export const modelRegistry = builtinModels({ credentials: credentialStore });
+
+const MAX_PROVIDER_RETRIES = 2;
+const MAX_PROVIDER_RETRY_DELAY_MS = 15_000;
 
 export type OAuthInteractionHandlers = {
   signal: AbortSignal;
@@ -27,9 +34,7 @@ export function createOAuthInteraction({
     prompt: (prompt) => {
       if (prompt.type !== "select") return requestInput(prompt.message);
       const firstOption = prompt.options[0];
-      if (!firstOption) {
-        return Promise.reject(new Error("No sign-in method is available."));
-      }
+      if (!firstOption) return Promise.reject(new Error("No sign-in method is available."));
       return Promise.resolve(firstOption.id);
     },
     notify: (event) => {
@@ -43,9 +48,8 @@ export function createOAuthInteraction({
       }
       if (event.type === "progress" || event.type === "info") {
         showStatus(event.message);
-        if (event.type === "info" && event.links?.[0]) {
+        if (event.type === "info" && event.links?.[0])
           showAuthUrl(event.links[0].url, event.message);
-        }
       }
     },
   };
@@ -57,39 +61,66 @@ export async function runSession(
   onActivity: (label: string) => void,
   requestQuestion: RequestUserQuestion,
 ): Promise<string | undefined> {
-  const { tool: askUserTool, state: questionState } = createAskUserTool(requestQuestion);
-  const agent = new Agent({
-    initialState: {
-      systemPrompt,
-      model,
-      thinkingLevel: "off",
-      tools: [askUserTool, ...createAnalysisTools(questionState)],
-      messages: [],
-    },
-    streamFn: (activeModel, context, options) =>
-      modelRegistry.streamSimple(activeModel, context, options),
-  });
+  beginAgentsViewAnalysis();
+  const availability = await getAgentsViewAvailability();
+  if (!availability.installed) {
+    const answer = await requestQuestion({
+      kind: "confirm",
+      question:
+        "Farpoint needs AgentsView to read your local coding-agent history. Install or prepare it now?",
+      options: ["Yes", "No"],
+      purpose: "source_install",
+    });
+    if (!["yes", "y"].includes(answer.trim().toLowerCase())) {
+      onText(
+        "Farpoint cannot analyze sessions until the local AgentsView data source is available.",
+      );
+      return undefined;
+    }
+    onActivity("Preparing local session data");
+    await installAgentsView();
+  }
 
-  let errorMessage: string | undefined;
-  agent.subscribe((event) => {
-    if (event.type === "tool_execution_start") {
-      onActivity(getToolLabel(event.toolName));
-      return;
-    }
-    if (event.type === "message_update") {
-      const update = event.assistantMessageEvent;
-      if (update.type === "text_delta") onText(update.delta);
-      return;
-    }
-    if (
-      event.type === "message_end" &&
-      event.message.role === "assistant" &&
-      event.message.errorMessage
-    ) {
-      errorMessage = event.message.errorMessage;
-    }
-  });
+  const analyze = async (workerSystemPrompt: string, prompt: string): Promise<string> => {
+    const agent = new Agent({
+      initialState: {
+        systemPrompt: workerSystemPrompt,
+        model,
+        thinkingLevel: "off",
+        tools: [],
+        messages: [],
+      },
+      streamFn: (activeModel, context, options) =>
+        modelRegistry.streamSimple(activeModel, context, {
+          ...options,
+          maxRetries: MAX_PROVIDER_RETRIES,
+          maxRetryDelayMs: MAX_PROVIDER_RETRY_DELAY_MS,
+        }),
+    });
+    let text = "";
+    let errorMessage: string | undefined;
+    agent.subscribe((event) => {
+      if (event.type === "message_update") {
+        const update = event.assistantMessageEvent;
+        if (update.type === "text_delta") text += update.delta;
+      }
+      if (
+        event.type === "message_end" &&
+        event.message.role === "assistant" &&
+        event.message.errorMessage
+      ) {
+        errorMessage = event.message.errorMessage;
+      }
+    });
+    await agent.prompt(prompt);
+    if (errorMessage) throw new Error(errorMessage);
+    if (!text.trim()) throw new Error("The analysis worker returned an empty response.");
+    return text;
+  };
 
-  await agent.prompt(initialRequest);
-  return errorMessage;
+  const { report, path } = await runFullCorpusAnalysis(analyze, (update) => {
+    onActivity(update.label);
+  });
+  onText(`${report.report_markdown}\n\n_Report saved to \`${path}\`._`);
+  return undefined;
 }

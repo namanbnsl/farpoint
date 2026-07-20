@@ -1,7 +1,5 @@
 import type { Api, Model } from "@earendil-works/pi-ai";
 import { Box, Text } from "ink";
-import BigText from "ink-big-text";
-import Gradient from "ink-gradient";
 import Link from "ink-link";
 import { authMethodOptions, type ProviderOption } from "../ai/providers.js";
 import { Hint, InputField, ScreenHeading, Selector, Shell, Spinner } from "../ui/primitives.js";
@@ -9,12 +7,9 @@ import { theme } from "../ui/theme.js";
 
 export function WelcomeScreen({ ready }: { ready: boolean }) {
   return (
-    <Shell stage="welcome" showHeader={false}>
-      <Gradient colors={[theme.accent, theme.code]}>
-        <BigText text="FARPOINT" font="tiny" />
-      </Gradient>
+    <Shell stage="welcome">
       <ScreenHeading>Understand how you work with coding agents.</ScreenHeading>
-      <Box marginTop={3} flexDirection="column">
+      <Box marginTop={2} flexDirection="column">
         <Text>
           Farpoint turns your coding sessions into clear, evidence-backed ways to improve.
         </Text>

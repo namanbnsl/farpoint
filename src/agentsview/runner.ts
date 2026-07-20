@@ -24,6 +24,16 @@ export type AgentsViewAvailability = {
 const MAX_OUTPUT_BYTES = 5 * 1024 * 1024;
 const DEFAULT_TIMEOUT_MS = 120_000;
 let activeInvocation: AgentsViewInvocation | undefined;
+let syncPromise: Promise<AgentsViewSyncResult> | undefined;
+
+export type AgentsViewSyncResult = {
+  synced: true;
+  detail: string;
+};
+
+export function beginAgentsViewAnalysis(): void {
+  syncPromise = undefined;
+}
 
 function appendBounded(current: string, chunk: Buffer): string {
   if (Buffer.byteLength(current) >= MAX_OUTPUT_BYTES) return current;
@@ -242,12 +252,38 @@ export async function installAgentsView(): Promise<{
   throw new Error(`AgentsView installation failed. ${failures.join(" ")}`);
 }
 
+/** Refresh the archive once before any Farpoint analytics read. */
+export async function syncAgentsView(): Promise<AgentsViewSyncResult> {
+  if (syncPromise) return syncPromise;
+
+  syncPromise = (async () => {
+    const availability = await getAgentsViewAvailability();
+    if (!availability.installed || !availability.invocation) {
+      throw new Error("AgentsView is not available. Ask the user before installing it.");
+    }
+
+    const invocation = availability.invocation;
+    const result = await runCommand(invocation.command, [...invocation.args, "sync"], 300_000);
+    if (result.exitCode !== 0) throw commandFailure(result);
+    return {
+      synced: true as const,
+      detail: result.stdout.trim() || "AgentsView sync completed.",
+    };
+  })().catch((error) => {
+    syncPromise = undefined;
+    throw error;
+  });
+
+  return syncPromise;
+}
+
 export async function runAgentsView(args: string[]): Promise<unknown> {
   const availability = await getAgentsViewAvailability();
   if (!availability.installed || !availability.invocation) {
     throw new Error("AgentsView is not available. Ask the user before installing it.");
   }
 
+  await syncAgentsView();
   const invocation = availability.invocation;
   const result = await runCommand(invocation.command, [...invocation.args, ...args]);
   if (result.exitCode !== 0) throw commandFailure(result);

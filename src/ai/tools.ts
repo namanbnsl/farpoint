@@ -1,74 +1,34 @@
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { Type } from "@earendil-works/pi-ai";
-import { getAgentsViewAvailability, installAgentsView, runAgentsView } from "../agentsview/runner";
+import {
+  getAgentsViewAvailability,
+  installAgentsView,
+  runAgentsView,
+  syncAgentsView,
+} from "../agentsview/runner";
 import type { UserQuestionState } from "./questions";
 
 const emptyParameters = Type.Object({});
 const toolLabels: Record<string, string> = {
   check_data_source: "Checking local session data",
   prepare_data_source: "Preparing local session data",
-  get_usage_report: "Reading usage history",
-  get_activity_report: "Reading activity history",
+  build_report_context: "Building a focused evidence set",
+  inspect_session: "Inspecting session evidence",
   ask_user: "Waiting for your input",
 };
+
+const OVERVIEW_BUDGET = 42_000;
+const SESSION_EVIDENCE_BUDGET = 18_000;
+const MAX_SESSION_INSPECTIONS = 6;
 
 export function getToolLabel(name: string): string {
   return toolLabels[name] ?? "Working";
 }
 
-const reportParameters = Type.Object({
-  window: Type.Optional(
-    Type.Union([Type.Literal("7d"), Type.Literal("30d"), Type.Literal("all")], {
-      description: "Common report window. Defaults to 30d.",
-    }),
-  ),
-  since: Type.Optional(
-    Type.String({
-      description:
-        "Custom inclusive report start such as 14d or 2026-07-01. Do not combine this with window.",
-    }),
-  ),
-  until: Type.Optional(
-    Type.String({
-      description: "Optional inclusive end date in YYYY-MM-DD format.",
-    }),
-  ),
-  agent: Type.Optional(
-    Type.String({
-      description: "Optional coding-agent name, such as codex or claude.",
-    }),
-  ),
+const inspectSessionParameters = Type.Object({
+  sessionId: Type.String({ description: "Exact AgentsView session id." }),
+  messageLimit: Type.Optional(Type.Number({ minimum: 5, maximum: 30 })),
 });
-
-function validateDateArgument(value: string | undefined, name: string): void {
-  if (value === undefined) return;
-  if (!/^(?:\d+[hdwmy]|\d{4}-\d{2}-\d{2})$/.test(value)) {
-    throw new Error(`${name} must be a duration such as 30d or a YYYY-MM-DD date.`);
-  }
-}
-
-type ReportParameters = {
-  window?: "7d" | "30d" | "all";
-  since?: string;
-  until?: string;
-  agent?: string;
-};
-
-function reportArgs(base: string[], parameters: ReportParameters, supportsAll: boolean): string[] {
-  const { window = "30d", since, until, agent } = parameters;
-  if (since && parameters.window) {
-    throw new Error("Use either window or since, not both.");
-  }
-  validateDateArgument(since, "since");
-  validateDateArgument(until, "until");
-
-  const args = [...base];
-  if (window === "all" && supportsAll) args.push("--all");
-  else args.push("--since", since ?? (window === "all" ? "1970-01-01" : window));
-  if (until) args.push("--until", until);
-  if (agent?.trim()) args.push("--agent", agent.trim());
-  return args;
-}
 
 function jsonToolResult(data: unknown, details: Record<string, unknown>) {
   return {
@@ -77,7 +37,41 @@ function jsonToolResult(data: unknown, details: Record<string, unknown>) {
   };
 }
 
+function compactValue(value: unknown, depth = 0): unknown {
+  if (depth > 5) return "[nested data omitted]";
+  if (typeof value === "string") {
+    return value.length > 1_000 ? `${value.slice(0, 1_000)}…` : value;
+  }
+  if (Array.isArray(value)) {
+    const limit = depth <= 1 ? 30 : 12;
+    const items: unknown[] = value.slice(0, limit).map((item) => compactValue(item, depth + 1));
+    if (value.length > limit) items.push(`[${value.length - limit} more items omitted]`);
+    return items;
+  }
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value)
+        .slice(0, 80)
+        .map(([key, item]) => [key, compactValue(item, depth + 1)]),
+    );
+  }
+  return value;
+}
+
+function fitToBudget(value: unknown, budget: number): unknown {
+  const compacted = compactValue(value);
+  const text = JSON.stringify(compacted);
+  if (text.length <= budget) return compacted;
+  return {
+    truncated: true,
+    characterBudget: budget,
+    data: text.slice(0, budget),
+  };
+}
+
 export function createAnalysisTools(questionState: UserQuestionState): AgentTool<any>[] {
+  let sessionInspections = 0;
+
   const statusTool: AgentTool<typeof emptyParameters> = {
     name: "check_data_source",
     label: "Check data source",
@@ -103,47 +97,103 @@ export function createAnalysisTools(questionState: UserQuestionState): AgentTool
         );
       }
       const installed = await installAgentsView();
+      const sync = await syncAgentsView();
       return jsonToolResult(
         {
           installed: true,
+          synced: true,
           method: installed.method,
-          detail:
-            installed.method === "uvx"
-              ? "The local data source is ready through uvx."
-              : "The local data source was installed and is ready.",
+          syncDetail: sync.detail,
         },
         installed,
       );
     },
   };
 
-  const usageTool: AgentTool<typeof reportParameters> = {
-    name: "get_usage_report",
-    label: "Get usage report",
+  const contextTool: AgentTool<typeof emptyParameters> = {
+    name: "build_report_context",
+    label: "Build report context",
     description:
-      "Return structured daily token and estimated-cost usage data for a selected time window.",
-    parameters: reportParameters,
-    execute: async (_toolCallId, parameters) => {
-      const data = await runAgentsView(
-        reportArgs(["usage", "daily", "--json", "--breakdown"], parameters, true),
+      "Build the complete, size-bounded overview for this report. It syncs once and returns aggregate history plus a session shortlist. Call exactly once.",
+    parameters: emptyParameters,
+    execute: async () => {
+      const sync = await syncAgentsView();
+      const [usage, stats, activity, health, skills, candidates] = await Promise.all([
+        runAgentsView(["usage", "daily", "--json", "--breakdown", "--all"]),
+        runAgentsView(["stats", "--format", "json", "--since", "1970-01-01"]),
+        runAgentsView(["activity", "report", "--preset", "month", "--json"]),
+        runAgentsView(["health", "--limit", "100", "--json"]),
+        runAgentsView(["skills", "list", "--format", "json"]),
+        runAgentsView(["session", "list", "--json", "--limit", "100"]),
+      ]);
+      const packet = fitToBudget(
+        {
+          generatedAt: new Date().toISOString(),
+          sync: sync.detail,
+          coverage: {
+            usage: "all time with daily breakdown",
+            stats: "all time",
+            activity: "last 30 days",
+            health: "100 recent sessions",
+            candidates: "100 recent sessions",
+          },
+          usage,
+          stats,
+          activity,
+          health,
+          skills,
+          sessionCandidates: candidates,
+        },
+        OVERVIEW_BUDGET,
       );
-      return jsonToolResult(data, { report: "usage", ...parameters });
+      return jsonToolResult(packet, {
+        report: "bounded_context",
+        characterBudget: OVERVIEW_BUDGET,
+      });
     },
   };
 
-  const activityTool: AgentTool<typeof reportParameters> = {
-    name: "get_activity_report",
-    label: "Get activity report",
+  const inspectTool: AgentTool<typeof inspectSessionParameters> = {
+    name: "inspect_session",
+    label: "Inspect session",
     description:
-      "Return structured aggregate session activity for a selected time window. Summarize only fields actually returned because the schema may evolve.",
-    parameters: reportParameters,
-    execute: async (_toolCallId, parameters) => {
-      const data = await runAgentsView(
-        reportArgs(["stats", "--format", "json"], parameters, false),
+      "Fetch bounded evidence for one shortlisted session. At most six sessions may be inspected.",
+    parameters: inspectSessionParameters,
+    execute: async (_toolCallId, { sessionId, messageLimit = 24 }) => {
+      if (sessionInspections >= MAX_SESSION_INSPECTIONS) {
+        throw new Error(
+          `The report is limited to ${MAX_SESSION_INSPECTIONS} deep session inspections. Synthesize the report from the evidence already collected.`,
+        );
+      }
+      sessionInspections += 1;
+      const [overview, messages, toolCalls, usage, health] = await Promise.all([
+        runAgentsView(["session", "get", sessionId, "--format", "json"]),
+        runAgentsView([
+          "session",
+          "messages",
+          sessionId,
+          "--from",
+          "0",
+          "--limit",
+          String(messageLimit),
+          "--json",
+        ]),
+        runAgentsView(["session", "tool-calls", sessionId, "--json"]),
+        runAgentsView(["session", "usage", sessionId, "--format", "json"]),
+        runAgentsView(["health", sessionId, "--json"]),
+      ]);
+      const evidence = fitToBudget(
+        { overview, messages, toolCalls, usage, health },
+        SESSION_EVIDENCE_BUDGET,
       );
-      return jsonToolResult(data, { report: "activity", ...parameters });
+      return jsonToolResult(evidence, {
+        report: "session_evidence",
+        sessionId,
+        inspection: sessionInspections,
+        characterBudget: SESSION_EVIDENCE_BUDGET,
+      });
     },
   };
 
-  return [statusTool, installTool, usageTool, activityTool];
+  return [statusTool, installTool, contextTool, inspectTool];
 }
