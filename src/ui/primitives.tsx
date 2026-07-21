@@ -5,38 +5,31 @@ import InkSpinner from "ink-spinner";
 import { updateTextInput } from "./text-input.js";
 import { theme } from "./theme.js";
 
-export type SelectOption = {
-  name: string;
-  detail?: string;
-};
+export type SelectOption = { name: string; detail?: string };
 
-export function Shell({ children, stage }: { children: React.ReactNode; stage: string }) {
+export function Shell({ children }: { children: React.ReactNode; stage: string }) {
   const { stdout } = useStdout();
-  const width = Math.min(104, Math.max(48, (stdout.columns ?? 100) - 2));
+  const columns = stdout.columns ?? 100;
+  const width = Math.min(96, Math.max(32, columns - 2));
+  const paddingX = columns < 64 ? 1 : 3;
   return (
-    <Box width={width} minHeight={28} flexDirection="column" paddingX={4} paddingY={3}>
+    <Box width={width} minHeight={24} flexDirection="column" paddingX={paddingX} paddingY={2}>
       <Gradient colors={[theme.accent, theme.code]}>
         <BigText text="FARPOINT" font="tiny" />
       </Gradient>
-      <Box marginTop={1}>
-        <Text color={theme.accent}>●</Text>
-        <Text color={theme.muted}> {stage}</Text>
-      </Box>
-      <Box marginTop={3} flexDirection="column" flexGrow={1}>
+      <Box marginTop={2} flexDirection="column" flexGrow={1}>
         {children}
       </Box>
     </Box>
   );
 }
-
 export function ScreenHeading({ children }: { children: React.ReactNode }) {
   return (
-    <Text bold color={theme.accentBright}>
+    <Text bold color={theme.heading}>
       {children}
     </Text>
   );
 }
-
 export function Selector({
   options,
   selectedIndex,
@@ -47,31 +40,30 @@ export function Selector({
   nameWidth?: number;
 }) {
   return (
-    <Box flexDirection="column" marginTop={2}>
+    <Box flexDirection="column" marginTop={1}>
       {options.map((option, index) => {
         const selected = index === selectedIndex;
         return (
           <Box key={`${option.name}-${index}`}>
-            <Box width={3}>
-              <Text color={selected ? theme.accent : theme.muted}>{selected ? "›" : " "}</Text>
+            <Box width={2}>
+              <Text bold color={selected ? theme.accent : theme.faint}>
+                {selected ? "›" : " "}
+              </Text>
             </Box>
             <Box width={nameWidth}>
-              <Text
-                bold={selected}
-                color={selected ? theme.accentBright : undefined}
-                backgroundColor={selected ? theme.accentDeep : undefined}
-              >
+              <Text bold={selected} color={selected ? theme.heading : theme.body}>
                 {option.name}
               </Text>
             </Box>
-            {option.detail ? <Text color={theme.muted}>{option.detail}</Text> : null}
+            {option.detail ? (
+              <Text color={selected ? theme.muted : theme.faint}>{option.detail}</Text>
+            ) : null}
           </Box>
         );
       })}
     </Box>
   );
 }
-
 export function InputField({
   value,
   placeholder,
@@ -88,19 +80,19 @@ export function InputField({
   onChange: (value: string) => void;
 }) {
   const { stdout } = useStdout();
-  const width = Math.min(maxWidth, Math.max(46, (stdout.columns ?? 100) - 16));
+  const width = Math.min(maxWidth, Math.max(28, (stdout.columns ?? 100) - 12));
   useInput((input, key) => {
     const nextValue = updateTextInput(value, input, key);
     if (nextValue !== undefined && nextValue !== value) onChange(nextValue);
   });
   const displayValue = masked ? "•".repeat(value.length) : value;
   return (
-    <Box marginTop={2} width={width} borderStyle="round" borderColor={theme.accent} paddingX={2}>
-      <Box width={3}>
+    <Box marginTop={1} width={width} borderStyle="round" borderColor={theme.border} paddingX={1}>
+      <Box width={2}>
         <Text color={theme.accent}>{icon}</Text>
       </Box>
       {displayValue ? (
-        <Text>
+        <Text color={theme.body}>
           {displayValue}
           <Text inverse> </Text>
         </Text>
@@ -113,22 +105,20 @@ export function InputField({
     </Box>
   );
 }
-
 export function Hint({ children }: { children: React.ReactNode }) {
   return (
-    <Box marginTop={3}>
-      <Text color={theme.muted}>{children}</Text>
+    <Box marginTop={2}>
+      <Text color={theme.faint}>{children}</Text>
     </Box>
   );
 }
-
 export function Spinner({ label }: { label: string }) {
   return (
     <Text>
       <Text color={theme.accent}>
         <InkSpinner type="dots" />
       </Text>{" "}
-      {label}
+      <Text color={theme.body}>{label}</Text>
     </Text>
   );
 }

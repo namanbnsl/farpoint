@@ -47,15 +47,44 @@ export type SessionFinding = {
   project: string;
   agent: string;
   outcome_assessment: string;
+  task_type: "debug" | "feature" | "refactor" | "test" | "config" | "other";
+  prompting_pattern: "specific" | "vague" | "mixed" | "unknown";
   friction: string[];
+  recurring_mistakes: string[];
   strengths: string[];
   user_preferences: string[];
+  confidence_score: number;
   themes: string[];
   advice: string[];
   confidence: "low" | "medium" | "high";
   evidence: EvidenceReference[];
 };
 
+export type DiscoveredInsight = {
+  title: string;
+  observation: string;
+  why_it_matters: string;
+  contrast: string;
+  competing_explanation: string;
+  action: string;
+  confidence: "low" | "medium" | "high";
+  confidence_score: number;
+  metric_evidence: string[];
+  expected_impact: string;
+  supporting_session_ids: string[];
+  evidence: EvidenceReference[];
+  evidence_basis: "aggregate" | "session" | "mixed";
+  lenses: string[];
+  score: number;
+  score_components: {
+    surprise: number;
+    evidence_strength: number;
+    recurrence: number;
+    actionable_impact: number;
+    specificity: number;
+  };
+  score_weights: Record<string, number>;
+};
 export type NumericSummary = {
   sessions: number;
   totals: Record<string, number>;
@@ -66,6 +95,12 @@ export type NumericSummary = {
   outcomes: Record<string, number>;
 };
 
+export type UserProfileClaim = {
+  claim: string;
+  supporting_session_ids: string[];
+  confidence: "tentative" | "repeated";
+};
+
 export type AnalysisReport = {
   schema_version: 1;
   generated_at: string;
@@ -73,23 +108,35 @@ export type AnalysisReport = {
     discovered: number;
     eligible: number;
     triaged: number;
+    triage_attempted: number;
+    triage_findings: number;
     deeply_inspected: number;
     excluded_as_noise: number;
     exceptional_noise_admitted: number;
   };
   metrics: NumericSummary;
+  agentsview_stats: unknown;
+  projects: unknown;
   session_findings: SessionFinding[];
+  discovered_insights: DiscoveredInsight[];
+  data_scopes: {
+    projects: string;
+    agentsview_stats: string;
+    metrics: string;
+  };
   user_profile: {
-    repeated_preferences: string[];
-    working_style: string[];
-    recurring_corrections: string[];
-    strengths: string[];
-    failure_modes: string[];
+    repeated_preferences: UserProfileClaim[];
+    working_style: UserProfileClaim[];
+    recurring_corrections: UserProfileClaim[];
+    strengths: UserProfileClaim[];
+    failure_modes: UserProfileClaim[];
   };
   recommendations: Array<{
     title: string;
     action: string;
+    rule?: string;
     kind: "instruction" | "skill" | "tooling" | "prompting" | "workflow";
+    provisional?: boolean;
     supporting_session_ids: string[];
   }>;
   evidence: EvidenceReference[];
@@ -98,6 +145,13 @@ export type AnalysisReport = {
 };
 
 export type ProgressUpdate = {
-  stage: "syncing" | "indexing" | "ranking" | "triaging" | "inspecting" | "synthesizing";
+  stage:
+    | "syncing"
+    | "indexing"
+    | "ranking"
+    | "triaging"
+    | "inspecting"
+    | "discovering"
+    | "synthesizing";
   label: string;
 };
