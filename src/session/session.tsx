@@ -12,7 +12,7 @@ type PendingQuestion = UserQuestion & {
   resolve: (answer: string) => void;
 };
 
-export type SessionProps = {
+type SessionProps = {
   model: Model<Api>;
   onBack: () => void;
 };
@@ -47,7 +47,7 @@ export function Session({ model, onBack }: SessionProps) {
     setQuestionIndex(0);
 
     try {
-      const sessionError = await runSession(
+      await runSession(
         model,
         (delta) => {
           setReply((current) => current + delta);
@@ -60,12 +60,7 @@ export function Session({ model, onBack }: SessionProps) {
         requestQuestion,
       );
 
-      if (sessionError) {
-        setError(sessionError);
-        setStatus("error");
-      } else {
-        setStatus("done");
-      }
+      setStatus("done");
     } catch (cause) {
       setError(messageFromError(cause));
       setStatus("error");

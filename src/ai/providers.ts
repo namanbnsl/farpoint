@@ -1,5 +1,4 @@
 import type { Api, Model, Provider } from "@earendil-works/pi-ai";
-import { matchesQuery } from "../search";
 
 export type ProviderId = string;
 export type AuthMethod = "oauth" | "api-key";
@@ -12,10 +11,15 @@ export type ProviderOption = {
   connected: boolean;
 };
 
-export type AuthMethodOption = {
+type AuthMethodOption = {
   name: string;
   detail: string;
 };
+
+function matchesQuery(query: string, values: Array<string | undefined>): boolean {
+  const normalizedQuery = query.trim().toLowerCase();
+  return !normalizedQuery || values.some((value) => value?.toLowerCase().includes(normalizedQuery));
+}
 
 const preferredProviderIds = [
   "openai-codex",

@@ -3,7 +3,7 @@ export function moveSelection(currentIndex: number, direction: -1 | 1, itemCount
   return Math.max(0, Math.min(itemCount - 1, currentIndex + direction));
 }
 
-export type SelectionWindow<T> = {
+type SelectionWindow<T> = {
   startIndex: number;
   items: T[];
 };

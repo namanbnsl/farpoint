@@ -7,7 +7,7 @@ import { theme } from "../ui/theme.js";
 
 export function WelcomeScreen({ ready }: { ready: boolean }) {
   return (
-    <Shell stage="welcome">
+    <Shell>
       <ScreenHeading>Understand how you work with coding agents.</ScreenHeading>
       <Box marginTop={2} flexDirection="column">
         <Text>
@@ -29,7 +29,7 @@ export function WelcomeScreen({ ready }: { ready: boolean }) {
   );
 }
 
-export type ProviderListScreenProps = {
+type ProviderListScreenProps = {
   providers: ProviderOption[];
   selectedIndex: number;
   query: string;
@@ -55,7 +55,7 @@ export function ProviderListScreen({
   onQueryChange,
 }: ProviderListScreenProps) {
   return (
-    <Shell stage="connections">
+    <Shell>
       <ScreenHeading>Choose a provider</ScreenHeading>
       <Box marginTop={1}>
         <Text color={theme.muted}>
@@ -105,7 +105,7 @@ export function AuthMethodScreen({
   selectedIndex: number;
 }) {
   return (
-    <Shell stage="connect">
+    <Shell>
       <ScreenHeading>Connect {provider?.name}</ScreenHeading>
       <Box marginTop={2}>
         <Text color={theme.muted}>Choose how you want to sign in.</Text>
@@ -132,7 +132,7 @@ export function ApiKeyScreen({
   onValueChange: (value: string) => void;
 }) {
   return (
-    <Shell stage="connect">
+    <Shell>
       <ScreenHeading>{providerName} API key</ScreenHeading>
       <Box marginTop={2}>
         <Text color={theme.muted}>Your key is stored locally.</Text>
@@ -144,7 +144,7 @@ export function ApiKeyScreen({
   );
 }
 
-export type OAuthScreenProps = {
+type OAuthScreenProps = {
   providerName: string | undefined;
   url: string;
   status: string;
@@ -166,7 +166,7 @@ export function OAuthScreen({
   onInputChange,
 }: OAuthScreenProps) {
   return (
-    <Shell stage="connect">
+    <Shell>
       <ScreenHeading>Sign in with {providerName}</ScreenHeading>
       <Box marginTop={1} flexDirection="column">
         {url ? (
@@ -211,7 +211,7 @@ export function OAuthScreen({
   );
 }
 
-export type ModelListScreenProps = {
+type ModelListScreenProps = {
   providerName: string | undefined;
   query: string;
   models: Model<Api>[];
@@ -231,7 +231,7 @@ export function ModelListScreen({
   onQueryChange,
 }: ModelListScreenProps) {
   return (
-    <Shell stage="model">
+    <Shell>
       <ScreenHeading>Choose a model</ScreenHeading>
       <Box marginTop={1}>
         <Text color={theme.success}>✓</Text>

@@ -16,7 +16,7 @@ export const modelRegistry = builtinModels({ credentials: credentialStore });
 const MAX_PROVIDER_RETRIES = 2;
 const MAX_PROVIDER_RETRY_DELAY_MS = 15_000;
 
-export type OAuthInteractionHandlers = {
+type OAuthInteractionHandlers = {
   signal: AbortSignal;
   requestInput: (message: string) => Promise<string>;
   showAuthUrl: (url: string, status?: string) => void;
@@ -60,7 +60,7 @@ export async function runSession(
   onText: (delta: string) => void,
   onActivity: (label: string) => void,
   requestQuestion: RequestUserQuestion,
-): Promise<string | undefined> {
+): Promise<void> {
   beginAgentsViewAnalysis();
   const availability = await getAgentsViewAvailability();
   if (!availability.installed) {
@@ -75,7 +75,7 @@ export async function runSession(
       onText(
         "Farpoint cannot analyze sessions until the local AgentsView data source is available.",
       );
-      return undefined;
+      return;
     }
     onActivity("Preparing local session data");
     await installAgentsView();
@@ -122,5 +122,4 @@ export async function runSession(
     onActivity(update.label);
   });
   onText(`${report.report_markdown}\n\n_Report saved to \`${path}\`._`);
-  return undefined;
 }

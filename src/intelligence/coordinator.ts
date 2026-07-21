@@ -24,8 +24,7 @@ type MessagePage = { messages?: Message[] };
 
 const TRIAGE_BATCH_SIZE = 10;
 const INITIAL_CANDIDATES = 50;
-const MIN_DEEP_INSPECTIONS = 18;
-const MAX_DEEP_INSPECTIONS = 18;
+const DEEP_INSPECTION_LIMIT = 18;
 const MAX_WORKERS = 3;
 const MAX_EXCERPT = 500;
 const MAX_PROMPT_CHARS = 70_000;
@@ -147,9 +146,26 @@ function cleanGeneratedText(text: string): string {
   return text.replace(/''/g, "'").trim();
 }
 
+function stringList(value: unknown, limit = 12): string[] {
+  return Array.isArray(value)
+    ? value
+        .filter((item): item is string => typeof item === "string")
+        .map(cleanGeneratedText)
+        .slice(0, limit)
+    : [];
+}
+
 function bounded(text: string | undefined, limit: number): string {
   if (!text) return "";
   return text.length <= limit ? text : `${text.slice(0, limit)}...`;
+}
+
+async function analyzeRecord(
+  analyze: AnalyzeText,
+  systemPrompt: string,
+  prompt: string,
+): Promise<Record<string, unknown> | undefined> {
+  return asRecord(extractJson(await analyze(systemPrompt, bounded(prompt, MAX_PROMPT_CHARS))));
 }
 
 function candidateMetadata(candidate: SessionCandidate) {
@@ -252,13 +268,6 @@ function normalizeFinding(
   const sessionId = typeof item?.session_id === "string" ? item.session_id : "";
   const candidate = candidates.get(sessionId);
   if (!candidate || !item) return undefined;
-  const strings = (key: string) =>
-    Array.isArray(item[key])
-      ? item[key]
-          .filter((part): part is string => typeof part === "string")
-          .map(cleanGeneratedText)
-          .slice(0, 12)
-      : [];
   const validIds = new Set([sessionId]);
   const evidence = Array.isArray(item.evidence)
     ? item.evidence.filter((entry) => isEvidence(entry, validIds)).slice(0, 12)
@@ -286,12 +295,12 @@ function normalizeFinding(
       item.prompting_pattern === "mixed"
         ? item.prompting_pattern
         : "unknown",
-    friction: strings("friction"),
-    recurring_mistakes: strings("recurring_mistakes"),
-    strengths: strings("strengths"),
-    user_preferences: strings("user_preferences"),
-    themes: strings("themes"),
-    advice: strings("advice"),
+    friction: stringList(item.friction),
+    recurring_mistakes: stringList(item.recurring_mistakes),
+    strengths: stringList(item.strengths),
+    user_preferences: stringList(item.user_preferences),
+    themes: stringList(item.themes),
+    advice: stringList(item.advice),
     confidence: "low",
     confidence_score: 0,
     evidence,
@@ -390,7 +399,7 @@ async function triageCandidates(
       MAX_PROMPT_CHARS,
     );
     try {
-      const parsed = asRecord(extractJson(await analyze(TRIAGE_SYSTEM_PROMPT, prompt)));
+      const parsed = await analyzeRecord(analyze, TRIAGE_SYSTEM_PROMPT, prompt);
       const findings = Array.isArray(parsed?.findings) ? parsed.findings : [];
       return findings
         .map((finding) => normalizeFinding(finding, candidateMap))
@@ -459,19 +468,6 @@ async function buildDeepPacket(candidate: SessionCandidate, finding: SessionFind
   };
 }
 
-function themeKeys(finding: SessionFinding): Set<string> {
-  return new Set(
-    [...finding.themes, ...finding.user_preferences]
-      .map((theme) =>
-        theme
-          .toLowerCase()
-          .replace(/[^a-z0-9 ]/g, "")
-          .trim(),
-      )
-      .filter(Boolean),
-  );
-}
-
 async function inspectDeeply(
   triage: SessionFinding[],
   candidateMap: Map<string, SessionCandidate>,
@@ -485,10 +481,8 @@ async function inspectDeeply(
         findingPriority(b, candidateMap.get(b.session_id)!) -
         findingPriority(a, candidateMap.get(a.session_id)!),
     )
-    .slice(0, MAX_DEEP_INSPECTIONS);
+    .slice(0, DEEP_INSPECTION_LIMIT);
   const deep: SessionFinding[] = [];
-  const themes = new Set<string>();
-  let stale = 0;
 
   for (let index = 0; index < ranked.length; index += MAX_WORKERS) {
     const batch = ranked.slice(index, index + MAX_WORKERS);
@@ -508,21 +502,10 @@ async function inspectDeeply(
       }
     });
     deep.push(...results);
-    let added = 0;
-    for (const finding of results) {
-      for (const theme of themeKeys(finding)) {
-        if (!themes.has(theme)) {
-          themes.add(theme);
-          added += 1;
-        }
-      }
-    }
-    stale = added === 0 ? stale + results.length : 0;
     onProgress({
       stage: "inspecting",
-      label: `Inspecting evidence · ${deep.length}/${Math.min(MAX_DEEP_INSPECTIONS, ranked.length)} sessions`,
+      label: `Inspecting evidence · ${deep.length}/${ranked.length} sessions`,
     });
-    if (deep.length >= MIN_DEEP_INSPECTIONS && stale >= 3) break;
   }
   return deep;
 }
@@ -537,13 +520,6 @@ function normalizeInsight(
   if (!item) return undefined;
   const text = (key: string) =>
     typeof item[key] === "string" ? bounded(cleanGeneratedText(item[key] as string), 1_200) : "";
-  const list = (key: string) =>
-    Array.isArray(item[key])
-      ? item[key]
-          .filter((part): part is string => typeof part === "string")
-          .map(cleanGeneratedText)
-          .slice(0, 12)
-      : [];
   const components = asRecord(item.score_components);
   const evidence =
     source === "session" && Array.isArray(item.evidence)
@@ -554,9 +530,9 @@ function normalizeInsight(
       : [];
   const supporting =
     source === "session"
-      ? list("supporting_session_ids").filter((id) => validSessionIds.has(id))
+      ? stringList(item.supporting_session_ids).filter((id) => validSessionIds.has(id))
       : [];
-  const metricEvidence = source === "aggregate" ? list("metric_evidence") : [];
+  const metricEvidence = source === "aggregate" ? stringList(item.metric_evidence) : [];
   const unresolvedAggregateCause =
     metricEvidence.length > 0 &&
     /\b(?:may|might|could|unknown|incomplete|outside|without)\b/i.test(
@@ -564,7 +540,7 @@ function normalizeInsight(
     );
   const rawConfidence =
     metricEvidence.length > 0
-      ? 0.62 + Math.min(2, metricEvidence.length) * 0.1 + (evidence.length > 0 ? 0.08 : 0)
+      ? 0.62 + Math.min(2, metricEvidence.length) * 0.1
       : evidence.length * 0.18 + supporting.length * 0.08;
   const confidenceScore = Math.min(unresolvedAggregateCause ? 0.74 : 0.92, rawConfidence);
   const confidence = confidenceScore >= 0.8 ? "high" : confidenceScore >= 0.5 ? "medium" : "low";
@@ -582,7 +558,7 @@ function normalizeInsight(
     metric_evidence: metricEvidence,
     evidence,
     evidence_basis: source,
-    lenses: list("lenses"),
+    lenses: stringList(item.lenses),
     score_components: {
       surprise: typeof components?.surprise === "number" ? components.surprise : 0,
       evidence_strength:
@@ -622,13 +598,10 @@ async function discoverInsights(
       })),
     };
     try {
-      const response = asRecord(
-        extractJson(
-          await analyze(
-            DISCOVERY_SYSTEM_PROMPT,
-            bounded(`Investigate this cohort:\n${JSON.stringify(packet)}`, MAX_PROMPT_CHARS),
-          ),
-        ),
+      const response = await analyzeRecord(
+        analyze,
+        DISCOVERY_SYSTEM_PROMPT,
+        `Investigate this cohort:\n${JSON.stringify(packet)}`,
       );
       const insights = Array.isArray(response?.insights) ? response.insights : [];
       return insights
@@ -642,16 +615,10 @@ async function discoverInsights(
   const bestByTitle = new Map<string, DiscoveredInsight>();
   let aggregateInsights: DiscoveredInsight[] = [];
   try {
-    const response = asRecord(
-      extractJson(
-        await analyze(
-          AGGREGATE_SYSTEM_PROMPT,
-          bounded(
-            `Analyze these computed aggregates:\n${JSON.stringify({ agentsview_stats: compactAggregateStats(agentsViewStats), projects, farpoint_metrics: metrics })}`,
-            MAX_PROMPT_CHARS,
-          ),
-        ),
-      ),
+    const response = await analyzeRecord(
+      analyze,
+      AGGREGATE_SYSTEM_PROMPT,
+      `Analyze these computed aggregates:\n${JSON.stringify({ agentsview_stats: compactAggregateStats(agentsViewStats), projects, farpoint_metrics: metrics })}`,
     );
     aggregateInsights = (Array.isArray(response?.insights) ? response.insights : [])
       .map((insight) => normalizeInsight(insight, [], new Set(), "aggregate"))
@@ -686,6 +653,77 @@ function fallbackMarkdown(report: Omit<AnalysisReport, "report_markdown">): stri
     "",
     "_The final synthesis response was unavailable; the structured evidence is preserved in analysis.json._",
   ].join("\n");
+}
+
+function buildUserProfile(
+  value: unknown,
+  validSessionIds: Set<string>,
+): AnalysisReport["user_profile"] {
+  const root = asRecord(value);
+  const claims = (entries: unknown): AnalysisReport["user_profile"]["working_style"] =>
+    Array.isArray(entries)
+      ? entries.flatMap((entry) => {
+          const item = asRecord(entry);
+          if (typeof item?.claim !== "string") return [];
+          const supporting = stringList(item.supporting_session_ids).filter((id) =>
+            validSessionIds.has(id),
+          );
+          if (supporting.length === 0) return [];
+          return [
+            {
+              claim: bounded(cleanGeneratedText(item.claim), 800),
+              supporting_session_ids: supporting,
+              confidence: supporting.length >= 3 ? ("repeated" as const) : ("tentative" as const),
+            },
+          ];
+        })
+      : [];
+  return {
+    repeated_preferences: claims(root?.repeated_preferences),
+    working_style: claims(root?.working_style),
+    recurring_corrections: claims(root?.recurring_corrections),
+    strengths: claims(root?.strengths),
+    failure_modes: claims(root?.failure_modes),
+  };
+}
+
+function normalizeRecommendation(
+  value: unknown,
+  validSessionIds: Set<string>,
+  forcedKind?: "skill",
+): AnalysisReport["recommendations"][number] | undefined {
+  const item = asRecord(value);
+  if (typeof item?.title !== "string" || typeof item.action !== "string") return undefined;
+
+  const kind =
+    forcedKind ??
+    (item.kind === "instruction" ||
+    item.kind === "skill" ||
+    item.kind === "tooling" ||
+    item.kind === "prompting"
+      ? item.kind
+      : "workflow");
+  const supporting = stringList(item.supporting_session_ids).filter((id) =>
+    validSessionIds.has(id),
+  );
+  const rule = typeof item.rule === "string" ? bounded(item.rule.trim(), 800) : "";
+  const provisional = item.provisional === true;
+  const validSkill =
+    (item.source_category === "prompting-pattern" ||
+      item.source_category === "recurring-mistake") &&
+    supporting.length >= (provisional ? 1 : 2) &&
+    rule.length >= 30 &&
+    /^(before|when|always|never|after|if)\b/i.test(rule);
+  if (kind === "skill" && !validSkill) return undefined;
+
+  return {
+    title: cleanGeneratedText(item.title),
+    action: cleanGeneratedText(item.action),
+    kind,
+    supporting_session_ids: supporting,
+    ...(kind === "skill" ? { provisional } : {}),
+    ...(rule ? { rule: cleanGeneratedText(rule) } : {}),
+  };
 }
 
 async function synthesize(
@@ -754,72 +792,23 @@ async function synthesize(
     })),
   };
   try {
-    const response = asRecord(
-      extractJson(
-        await analyze(
-          SYNTHESIS_SYSTEM_PROMPT,
-          bounded(
-            `Produce the synthesis fields in this shape:\n${JSON.stringify(requested)}\nEvidence packet:\n${JSON.stringify(synthesisPacket)}`,
-            MAX_PROMPT_CHARS,
-          ),
-        ),
-      ),
+    const response = await analyzeRecord(
+      analyze,
+      SYNTHESIS_SYSTEM_PROMPT,
+      `Produce the synthesis fields in this shape:\n${JSON.stringify(requested)}\nEvidence packet:\n${JSON.stringify(synthesisPacket)}`,
     );
-    const stringList = (value: unknown) =>
-      Array.isArray(value)
-        ? value
-            .filter((item): item is string => typeof item === "string")
-            .map(cleanGeneratedText)
-            .slice(0, 12)
-        : [];
-    const profileRoot = asRecord(response?.user_profile);
-    const normalizeProfileClaims = (
-      value: unknown,
-    ): AnalysisReport["user_profile"]["working_style"] =>
-      Array.isArray(value)
-        ? value.flatMap((entry) => {
-            const claim = asRecord(entry);
-            if (!claim || typeof claim.claim !== "string") return [];
-            const supporting = stringList(claim.supporting_session_ids).filter((id) =>
-              validSessionIds.has(id),
-            );
-            if (supporting.length === 0) return [];
-            return [
-              {
-                claim: bounded(cleanGeneratedText(claim.claim), 800),
-                supporting_session_ids: supporting,
-                confidence: supporting.length >= 3 ? ("repeated" as const) : ("tentative" as const),
-              },
-            ];
-          })
-        : [];
-    const buildUserProfile = (
-      root: Record<string, unknown> | undefined,
-    ): AnalysisReport["user_profile"] => ({
-      repeated_preferences: normalizeProfileClaims(root?.repeated_preferences),
-      working_style: normalizeProfileClaims(root?.working_style),
-      recurring_corrections: normalizeProfileClaims(root?.recurring_corrections),
-      strengths: normalizeProfileClaims(root?.strengths),
-      failure_modes: normalizeProfileClaims(root?.failure_modes),
-    });
-    let userProfile = buildUserProfile(profileRoot);
+    let userProfile = buildUserProfile(response?.user_profile, validSessionIds);
     if (
       Object.values(userProfile).every((claims) => claims.length === 0) &&
       base.session_findings.some((finding) => finding.evidence.length > 0)
     ) {
       try {
-        const generated = asRecord(
-          extractJson(
-            await analyze(
-              PROFILE_SYSTEM_PROMPT,
-              bounded(
-                `Build a profile from these findings:\n${JSON.stringify(synthesisPacket.session_findings)}`,
-                MAX_PROMPT_CHARS,
-              ),
-            ),
-          ),
+        const generated = await analyzeRecord(
+          analyze,
+          PROFILE_SYSTEM_PROMPT,
+          `Build a profile from these findings:\n${JSON.stringify(synthesisPacket.session_findings)}`,
         );
-        userProfile = buildUserProfile(asRecord(generated?.user_profile));
+        userProfile = buildUserProfile(generated?.user_profile, validSessionIds);
       } catch {
         // An empty profile is more honest than ungrounded fallback text.
       }
@@ -828,43 +817,8 @@ async function synthesize(
       response?.recommendations,
     )
       ? response.recommendations.flatMap((value) => {
-          const item = asRecord(value);
-          if (!item || typeof item.title !== "string" || typeof item.action !== "string") return [];
-          const kind =
-            item.kind === "instruction" ||
-            item.kind === "skill" ||
-            item.kind === "tooling" ||
-            item.kind === "prompting"
-              ? item.kind
-              : "workflow";
-          const supporting = stringList(item.supporting_session_ids).filter((id) =>
-            validSessionIds.has(id),
-          );
-          const sourceCategory =
-            item.source_category === "prompting-pattern" ||
-            item.source_category === "recurring-mistake"
-              ? item.source_category
-              : "other";
-          const rule = typeof item.rule === "string" ? bounded(item.rule.trim(), 800) : "";
-          const provisional = item.provisional === true;
-          if (
-            kind === "skill" &&
-            (sourceCategory === "other" ||
-              supporting.length < (provisional ? 1 : 2) ||
-              rule.length < 30 ||
-              !/^(before|when|always|never|after|if)\b/i.test(rule))
-          )
-            return [];
-          return [
-            {
-              title: cleanGeneratedText(item.title),
-              action: cleanGeneratedText(item.action),
-              kind,
-              supporting_session_ids: supporting,
-              ...(kind === "skill" ? { provisional } : {}),
-              ...(rule ? { rule: cleanGeneratedText(rule) } : {}),
-            },
-          ];
+          const recommendation = normalizeRecommendation(value, validSessionIds);
+          return recommendation ? [recommendation] : [];
         })
       : [];
     let recommendations = modelRecommendations.slice(0, 12);
@@ -885,46 +839,13 @@ async function synthesize(
           evidence: finding.evidence.slice(0, 2),
         }));
       try {
-        const generated = asRecord(
-          extractJson(
-            await analyze(
-              SKILL_SYSTEM_PROMPT,
-              bounded(
-                `Design one skill from these findings:\n${JSON.stringify(skillFindings)}`,
-                MAX_PROMPT_CHARS,
-              ),
-            ),
-          ),
+        const generated = await analyzeRecord(
+          analyze,
+          SKILL_SYSTEM_PROMPT,
+          `Design one skill from these findings:\n${JSON.stringify(skillFindings)}`,
         );
-        const item = asRecord(generated?.recommendation);
-        if (item && typeof item.title === "string" && typeof item.action === "string") {
-          const supporting = stringList(item.supporting_session_ids).filter((id) =>
-            validSessionIds.has(id),
-          );
-          const sourceIsValid =
-            item.source_category === "prompting-pattern" ||
-            item.source_category === "recurring-mistake";
-          const rule = typeof item.rule === "string" ? bounded(item.rule.trim(), 800) : "";
-          const provisional = item.provisional === true;
-          if (
-            sourceIsValid &&
-            supporting.length >= (provisional ? 1 : 2) &&
-            rule.length >= 30 &&
-            /^(before|when|always|never|after|if)\b/i.test(rule)
-          ) {
-            recommendations = [
-              ...recommendations,
-              {
-                title: cleanGeneratedText(item.title),
-                action: cleanGeneratedText(item.action),
-                kind: "skill",
-                provisional,
-                rule: cleanGeneratedText(rule),
-                supporting_session_ids: supporting,
-              },
-            ];
-          }
-        }
+        const skill = normalizeRecommendation(generated?.recommendation, validSessionIds, "skill");
+        if (skill) recommendations = [...recommendations, skill];
       } catch {
         // The primary synthesis remains valid when the focused skill pass fails.
       }

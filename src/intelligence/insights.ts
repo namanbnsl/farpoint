@@ -5,7 +5,7 @@ import type {
   SessionFinding,
 } from "./types.ts";
 
-export type DiscoveryLens =
+type DiscoveryLens =
   | "correction-mining"
   | "success-outliers"
   | "matched-contrasts"
@@ -18,13 +18,13 @@ export type DiscoveryLens =
   | "productive-friction"
   | "project-health";
 
-export type DiscoveryCohort = {
+type DiscoveryCohort = {
   id: string;
   lenses: DiscoveryLens[];
   rationale: string;
   sessions: Array<{ metadata: SessionCandidate; finding: SessionFinding }>;
 };
-export const SCORE_WEIGHTS = {
+const SCORE_WEIGHTS = {
   surprise: 0.2,
   evidence_strength: 0.25,
   recurrence: 0.15,

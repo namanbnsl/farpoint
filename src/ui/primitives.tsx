@@ -2,12 +2,11 @@ import { Box, Text, useInput, useStdout } from "ink";
 import BigText from "ink-big-text";
 import Gradient from "ink-gradient";
 import InkSpinner from "ink-spinner";
-import { updateTextInput } from "./text-input.js";
 import { theme } from "./theme.js";
 
-export type SelectOption = { name: string; detail?: string };
+type SelectOption = { name: string; detail?: string };
 
-export function Shell({ children }: { children: React.ReactNode; stage: string }) {
+export function Shell({ children }: { children: React.ReactNode }) {
   const { stdout } = useStdout();
   const columns = stdout.columns ?? 100;
   const width = Math.min(96, Math.max(32, columns - 2));
@@ -82,8 +81,13 @@ export function InputField({
   const { stdout } = useStdout();
   const width = Math.min(maxWidth, Math.max(28, (stdout.columns ?? 100) - 12));
   useInput((input, key) => {
-    const nextValue = updateTextInput(value, input, key);
-    if (nextValue !== undefined && nextValue !== value) onChange(nextValue);
+    if (key.backspace || key.delete) {
+      onChange(value.slice(0, -1));
+      return;
+    }
+    if (key.ctrl || key.meta) return;
+    const typedCharacters = input.replace(/[\r\n]/g, "");
+    if (typedCharacters) onChange(value + typedCharacters);
   });
   const displayValue = masked ? "•".repeat(value.length) : value;
   return (

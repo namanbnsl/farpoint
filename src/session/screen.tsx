@@ -1,12 +1,11 @@
 import type { Api, Model } from "@earendil-works/pi-ai";
 import { Box, Text } from "ink";
 import type { UserQuestion } from "../ai/questions";
-import { initialRequest } from "../ai/system-prompt";
 import { Markdown } from "../ui/markdown";
 import { Hint, InputField, Selector, Shell, Spinner } from "../ui/primitives";
 import { theme } from "../ui/theme";
 
-export type SessionScreenProps = {
+type SessionScreenProps = {
   model: Model<Api>;
   reply: string;
   status: "running" | "done" | "error";
@@ -30,13 +29,17 @@ export function SessionScreen({
   onQuestionChange,
 }: SessionScreenProps) {
   return (
-    <Shell stage="report">
+    <Shell>
       <Text color={theme.muted}>{model.name} · local session report</Text>
       <Box marginTop={2} flexDirection="column">
         <Text bold color={theme.heading}>
           Request
         </Text>
-        <Text color={theme.muted}>{initialRequest}</Text>
+        <Text color={theme.muted}>
+          {
+            "Analyze my full coding-agent history and turn real session evidence into specific improvements."
+          }
+        </Text>
         {activities.length > 0 ? (
           <Box marginTop={2} flexDirection="column">
             {activities.map((activity, index) => (

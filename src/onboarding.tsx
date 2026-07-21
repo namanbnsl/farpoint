@@ -78,6 +78,20 @@ export function Onboarding({ onComplete }: { onComplete: (model: Model<Api>) => 
     [selectedIndex, visibleModels],
   );
 
+  const moveSelected = useCallback((direction: -1 | 1, itemCount: number) => {
+    setSelectedIndex((current) => moveSelection(current, direction, itemCount));
+  }, []);
+
+  const changeProviderQuery = useCallback((value: string) => {
+    setProviderQuery(value);
+    setSelectedIndex(0);
+  }, []);
+
+  const changeModelQuery = useCallback((value: string) => {
+    setModelQuery(value);
+    setSelectedIndex(0);
+  }, []);
+
   const refreshConnections = useCallback(async () => {
     const storedCredentials = await credentialStore.list();
     setConnectedProviderIds(new Set(storedCredentials.map((credential) => credential.providerId)));
@@ -257,12 +271,8 @@ export function Onboarding({ onComplete }: { onComplete: (model: Model<Api>) => 
     }
 
     if (screen === "providers") {
-      if (key.upArrow) {
-        setSelectedIndex((current) => moveSelection(current, -1, visibleProviders.length));
-      }
-      if (key.downArrow) {
-        setSelectedIndex((current) => moveSelection(current, 1, visibleProviders.length));
-      }
+      if (key.upArrow) moveSelected(-1, visibleProviders.length);
+      if (key.downArrow) moveSelected(1, visibleProviders.length);
       if (key.escape) {
         if (providerQuery) {
           setProviderQuery("");
@@ -288,12 +298,8 @@ export function Onboarding({ onComplete }: { onComplete: (model: Model<Api>) => 
 
     if (screen === "auth-method") {
       const methodCount = activeProvider?.methods.length ?? 0;
-      if (key.upArrow) {
-        setSelectedIndex((current) => moveSelection(current, -1, methodCount));
-      }
-      if (key.downArrow) {
-        setSelectedIndex((current) => moveSelection(current, 1, methodCount));
-      }
+      if (key.upArrow) moveSelected(-1, methodCount);
+      if (key.downArrow) moveSelected(1, methodCount);
       if (key.escape) returnToProviders();
       if (key.return) {
         const method = activeProvider?.methods[selectedIndex];
@@ -327,12 +333,8 @@ export function Onboarding({ onComplete }: { onComplete: (model: Model<Api>) => 
     }
 
     if (screen === "model") {
-      if (key.upArrow) {
-        setSelectedIndex((current) => moveSelection(current, -1, visibleModels.length));
-      }
-      if (key.downArrow) {
-        setSelectedIndex((current) => moveSelection(current, 1, visibleModels.length));
-      }
+      if (key.upArrow) moveSelected(-1, visibleModels.length);
+      if (key.downArrow) moveSelected(1, visibleModels.length);
       if (key.escape) {
         if (modelQuery) {
           setModelQuery("");
@@ -366,10 +368,7 @@ export function Onboarding({ onComplete }: { onComplete: (model: Model<Api>) => 
           error={error}
           notice={notice}
           credentialPath={authPath}
-          onQueryChange={(value) => {
-            setProviderQuery(value);
-            setSelectedIndex(0);
-          }}
+          onQueryChange={changeProviderQuery}
         />
       );
     case "auth-method":
@@ -405,10 +404,7 @@ export function Onboarding({ onComplete }: { onComplete: (model: Model<Api>) => 
           selectedIndex={selectedIndex - modelWindow.startIndex}
           filteredCount={visibleModels.length}
           totalCount={availableModels.length}
-          onQueryChange={(value) => {
-            setModelQuery(value);
-            setSelectedIndex(0);
-          }}
+          onQueryChange={changeModelQuery}
         />
       );
   }

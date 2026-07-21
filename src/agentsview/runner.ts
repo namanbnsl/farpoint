@@ -8,13 +8,13 @@ type CommandResult = {
   exitCode: number | null;
 };
 
-export type AgentsViewInvocation = {
+type AgentsViewInvocation = {
   command: string;
   args: string[];
   source: "binary" | "uvx";
 };
 
-export type AgentsViewAvailability = {
+type AgentsViewAvailability = {
   installed: boolean;
   invocation?: AgentsViewInvocation;
   recommendedInstallMethod: "uvx" | "pip" | "official-installer" | "unavailable";
@@ -26,7 +26,7 @@ const DEFAULT_TIMEOUT_MS = 120_000;
 let activeInvocation: AgentsViewInvocation | undefined;
 let syncPromise: Promise<AgentsViewSyncResult> | undefined;
 
-export type AgentsViewSyncResult = {
+type AgentsViewSyncResult = {
   synced: true;
   detail: string;
 };
@@ -170,6 +170,14 @@ function commandFailure(result: CommandResult): Error {
   return new Error(`${result.command} exited with code ${result.exitCode ?? "unknown"}: ${detail}`);
 }
 
+async function requireAgentsView(): Promise<AgentsViewInvocation> {
+  const availability = await getAgentsViewAvailability();
+  if (!availability.installed || !availability.invocation) {
+    throw new Error("AgentsView is not available. Ask the user before installing it.");
+  }
+  return availability.invocation;
+}
+
 async function installWithUvx(): Promise<AgentsViewInvocation | undefined> {
   if (!(await commandWorks("uvx", ["--version"]))) return undefined;
   const result = await runCommand("uvx", ["agentsview", "version"], 180_000);
@@ -220,33 +228,24 @@ export async function installAgentsView(): Promise<{
   }
 
   const failures: string[] = [];
+  const installers: Array<{
+    method: "uvx" | "pip" | "official-installer";
+    install: () => Promise<AgentsViewInvocation | undefined>;
+  }> = [
+    { method: "uvx", install: installWithUvx },
+    { method: "pip", install: installWithPip },
+    { method: "official-installer", install: installWithOfficialScript },
+  ];
 
-  try {
-    const invocation = await installWithUvx();
-    if (invocation) {
+  for (const { method, install } of installers) {
+    try {
+      const invocation = await install();
+      if (!invocation) continue;
       activeInvocation = invocation;
-      return { invocation, method: "uvx" };
+      return { invocation, method };
+    } catch (error) {
+      failures.push(error instanceof Error ? error.message : String(error));
     }
-  } catch (error) {
-    failures.push(error instanceof Error ? error.message : String(error));
-  }
-
-  try {
-    const invocation = await installWithPip();
-    if (invocation) {
-      activeInvocation = invocation;
-      return { invocation, method: "pip" };
-    }
-  } catch (error) {
-    failures.push(error instanceof Error ? error.message : String(error));
-  }
-
-  try {
-    const invocation = await installWithOfficialScript();
-    activeInvocation = invocation;
-    return { invocation, method: "official-installer" };
-  } catch (error) {
-    failures.push(error instanceof Error ? error.message : String(error));
   }
 
   throw new Error(`AgentsView installation failed. ${failures.join(" ")}`);
@@ -257,12 +256,7 @@ export async function syncAgentsView(): Promise<AgentsViewSyncResult> {
   if (syncPromise) return syncPromise;
 
   syncPromise = (async () => {
-    const availability = await getAgentsViewAvailability();
-    if (!availability.installed || !availability.invocation) {
-      throw new Error("AgentsView is not available. Ask the user before installing it.");
-    }
-
-    const invocation = availability.invocation;
+    const invocation = await requireAgentsView();
     const result = await runCommand(invocation.command, [...invocation.args, "sync"], 300_000);
     if (result.exitCode !== 0) throw commandFailure(result);
     return {
@@ -278,13 +272,8 @@ export async function syncAgentsView(): Promise<AgentsViewSyncResult> {
 }
 
 export async function runAgentsView(args: string[]): Promise<unknown> {
-  const availability = await getAgentsViewAvailability();
-  if (!availability.installed || !availability.invocation) {
-    throw new Error("AgentsView is not available. Ask the user before installing it.");
-  }
-
+  const invocation = await requireAgentsView();
   await syncAgentsView();
-  const invocation = availability.invocation;
   const result = await runCommand(invocation.command, [...invocation.args, ...args]);
   if (result.exitCode !== 0) throw commandFailure(result);
 
