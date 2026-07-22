@@ -74,7 +74,7 @@ export type DiscoveredInsight = {
   expected_impact: string;
   supporting_session_ids: string[];
   evidence: EvidenceReference[];
-  evidence_basis: "aggregate" | "session" | "mixed";
+  evidence_basis: "aggregate" | "aggregate+session" | "session";
   lenses: string[];
   score: number;
   score_components: {
@@ -99,7 +99,7 @@ export type NumericSummary = {
 export type UserProfileClaim = {
   claim: string;
   supporting_session_ids: string[];
-  confidence: "tentative" | "repeated";
+  support_tier: "tentative" | "repeated";
 };
 
 export type AnalysisReport = {

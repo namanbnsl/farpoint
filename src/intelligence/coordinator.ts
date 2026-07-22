@@ -90,6 +90,144 @@ recurring_corrections, strengths, and failure_modes. Each bucket contains claim 
 supporting_session_ids. Use exact supplied ids. Do not generalize beyond the evidence; a claim
 with fewer than three supporting sessions is tentative, not repeated.`;
 
+const MATCH_STOP_WORDS = new Set([
+  "about",
+  "across",
+  "adopted",
+  "agent",
+  "archive",
+  "could",
+  "distinct",
+  "from",
+  "have",
+  "insight",
+  "metric",
+  "project",
+  "recorded",
+  "reports",
+  "session",
+  "sessions",
+  "that",
+  "their",
+  "these",
+  "this",
+  "with",
+]);
+
+function matchTerms(text: string): Set<string> {
+  return new Set(
+    text
+      .toLowerCase()
+      .match(/[a-z0-9][a-z0-9_-]*/g)
+      ?.map((term) => term.replace(/ies$/, "y").replace(/ing$/, "").replace(/s$/, ""))
+      .filter((term) => term.length >= 4 && !MATCH_STOP_WORDS.has(term)) ?? [],
+  );
+}
+
+function sharesTerm(left: Set<string>, right: Set<string>): boolean {
+  return [...left].some((term) => right.has(term));
+}
+
+function matchingAggregateSubjects(
+  insight: DiscoveredInsight,
+  findings: SessionFinding[],
+): { kind: "agent" | "project"; value: string }[] {
+  const narrative = `${insight.title} ${insight.observation}`.toLowerCase();
+  const metrics = insight.metric_evidence.join(" ").toLowerCase();
+  const values = (kind: "agent" | "project") => [
+    ...new Set(
+      findings
+        .map((finding) => finding[kind])
+        .filter(
+          (value) =>
+            value !== "unknown" &&
+            (narrative.includes(value.toLowerCase()) ||
+              metrics.includes(`.by_${kind}.${value.toLowerCase()}.`)),
+        ),
+    ),
+  ];
+  const agents = values("agent");
+  return (agents.length > 0 ? agents : values("project")).map((value) => ({
+    kind: agents.length > 0 ? "agent" : "project",
+    value,
+  }));
+}
+
+/** Conservatively fuse qualitative support only when subject, finding, and excerpt all match. */
+function linkAggregateSessionEvidence(
+  insights: DiscoveredInsight[],
+  findings: SessionFinding[],
+): DiscoveredInsight[] {
+  return insights.map((insight) => {
+    if (insight.evidence_basis !== "aggregate") return insight;
+    const insightText = [
+      insight.title,
+      insight.observation,
+      insight.action,
+      ...insight.metric_evidence,
+    ].join(" ");
+    const subjects = matchingAggregateSubjects(insight, findings);
+    if (subjects.length === 0) return insight;
+
+    const phenomenon = matchTerms(insightText);
+    for (const subject of subjects) {
+      for (const term of matchTerms(subject.value)) phenomenon.delete(term);
+    }
+    const qualifying = findings.flatMap((finding) => {
+      if (!subjects.some(({ kind, value }) => finding[kind] === value)) return [];
+      const findingTerms = matchTerms(
+        [finding.outcome_assessment, ...finding.friction, ...finding.advice].join(" "),
+      );
+      if (!sharesTerm(phenomenon, findingTerms)) return [];
+      const evidence = finding.evidence.filter(
+        (item) =>
+          item.agent === finding.agent &&
+          item.project === finding.project &&
+          sharesTerm(phenomenon, matchTerms(item.excerpt)),
+      );
+      return evidence.length > 0 ? [{ finding, evidence }] : [];
+    });
+    if (qualifying.length === 0) return insight;
+
+    const supportingSessionIds = [...new Set(qualifying.map(({ finding }) => finding.session_id))];
+    return {
+      ...insight,
+      observation: insight.observation.replace(
+        /Aggregate-only; support: 0 inspected sessions\./,
+        `Aggregate plus session evidence; support: ${supportingSessionIds.length} inspected ${supportingSessionIds.length === 1 ? "session" : "sessions"}.`,
+      ),
+      why_it_matters: insight.why_it_matters.replace(
+        /without qualitative session evidence/i,
+        "with matching qualitative session evidence",
+      ),
+      support_count: supportingSessionIds.length,
+      supporting_session_ids: supportingSessionIds,
+      evidence: qualifying.flatMap(({ evidence }) => evidence),
+      evidence_basis: "aggregate+session",
+    };
+  });
+}
+
+function alignSkillAdoptionAction(
+  insights: DiscoveredInsight[],
+  recommendations: AnalysisReport["recommendations"],
+): DiscoveredInsight[] {
+  const shippedSkill = recommendations.find(
+    (recommendation) => recommendation.kind === "skill" && recommendation.provisional === false,
+  );
+  if (!shippedSkill) return insights;
+  return insights.map((insight) =>
+    insight.metric_evidence.some((metric) =>
+      /agentsview_stats\.adoption\.distinct_skills\s*=\s*0\b/i.test(metric),
+    )
+      ? {
+          ...insight,
+          action: `Track whether the '${shippedSkill.title}' skill raises distinct_skills above 0 in the next report.`,
+        }
+      : insight,
+  );
+}
+
 function asRecord(value: unknown): Record<string, unknown> | undefined {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -652,7 +790,10 @@ async function discoverInsights(
     const existing = bestByTitle.get(key);
     if (!existing || insight.score > existing.score) bestByTitle.set(key, insight);
   }
-  return [...bestByTitle.values()].sort((a, b) => b.score - a.score).slice(0, 12);
+  return linkAggregateSessionEvidence(
+    [...bestByTitle.values()].sort((a, b) => b.score - a.score).slice(0, 12),
+    findings,
+  );
 }
 function fallbackMarkdown(report: Omit<AnalysisReport, "report_markdown">): string {
   const findings = report.session_findings.slice(0, 8);
@@ -672,6 +813,18 @@ function fallbackMarkdown(report: Omit<AnalysisReport, "report_markdown">): stri
   ].join("\n");
 }
 
+function cleanProfileClaim(text: string): string {
+  return bounded(cleanGeneratedText(text), 800).replace(
+    /\((\d+) sessions?: ([^)]+)\)/gi,
+    (label, count: string, names: string) => {
+      const projects = [...new Set(names.split(",").map((name) => name.trim()))];
+      return projects.length < names.split(",").length
+        ? `(${count} sessions across ${projects.join(", ")})`
+        : label;
+    },
+  );
+}
+
 function buildUserProfile(
   value: unknown,
   validSessionIds: Set<string>,
@@ -682,15 +835,17 @@ function buildUserProfile(
       ? entries.flatMap((entry) => {
           const item = asRecord(entry);
           if (typeof item?.claim !== "string") return [];
-          const supporting = stringList(item.supporting_session_ids).filter((id) =>
-            validSessionIds.has(id),
-          );
-          if (supporting.length === 0) return [];
+          const supporting = [
+            ...new Set(
+              stringList(item.supporting_session_ids).filter((id) => validSessionIds.has(id)),
+            ),
+          ];
+          if (supporting.length < 2) return [];
           return [
             {
-              claim: bounded(cleanGeneratedText(item.claim), 800),
+              claim: cleanProfileClaim(item.claim),
               supporting_session_ids: supporting,
-              confidence: supporting.length >= 3 ? ("repeated" as const) : ("tentative" as const),
+              support_tier: supporting.length >= 3 ? ("repeated" as const) : ("tentative" as const),
             },
           ];
         })
@@ -872,6 +1027,7 @@ async function synthesize(
     );
     const partial: Omit<AnalysisReport, "report_markdown"> = {
       ...base,
+      discovered_insights: alignSkillAdoptionAction(base.discovered_insights, recommendations),
       user_profile: userProfile,
       recommendations,
       limitations,
