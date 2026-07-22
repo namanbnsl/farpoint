@@ -67,8 +67,9 @@ export type DiscoveredInsight = {
   contrast: string;
   competing_explanation: string;
   action: string;
-  confidence: "low" | "medium" | "high";
+  confidence: "low" | "medium" | "high" | "tentative";
   confidence_score: number;
+  support_count: number;
   metric_evidence: string[];
   expected_impact: string;
   supporting_session_ids: string[];

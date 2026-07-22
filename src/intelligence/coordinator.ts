@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { runAgentsView, syncAgentsView } from "../agentsview/runner";
 import { computeMetrics, paginateSessions, rankCandidates, selectCorpus } from "./corpus";
 import {
+  buildBaselineAggregateInsights,
   buildDiscoveryCohorts,
   isUsefulInsight,
   reconcileInsightEvidence,
@@ -543,16 +544,31 @@ function normalizeInsight(
       ? 0.62 + Math.min(2, metricEvidence.length) * 0.1
       : evidence.length * 0.18 + supporting.length * 0.08;
   const confidenceScore = Math.min(unresolvedAggregateCause ? 0.74 : 0.92, rawConfidence);
-  const confidence = confidenceScore >= 0.8 ? "high" : confidenceScore >= 0.5 ? "medium" : "low";
+  const supportCount = new Set(supporting).size;
+  const confidence =
+    source === "session"
+      ? supportCount >= 3 && confidenceScore >= 0.8
+        ? "high"
+        : "tentative"
+      : confidenceScore >= 0.8
+        ? "high"
+        : confidenceScore >= 0.5
+          ? "medium"
+          : "low";
+  const observation = text("observation");
   return scoreInsight({
     title: text("title"),
-    observation: text("observation"),
+    observation:
+      source === "session" && !/support:\s*\d+\s+sessions?/i.test(observation)
+        ? `${observation} Support: ${supportCount} ${supportCount === 1 ? "session" : "sessions"}; ${supportCount >= 3 ? "high confidence" : "tentative"}.`
+        : observation,
     why_it_matters: text("why_it_matters"),
     contrast: text("contrast"),
     competing_explanation: text("competing_explanation"),
     action: text("action"),
     confidence,
     confidence_score: Math.round(confidenceScore * 100) / 100,
+    support_count: supportCount,
     expected_impact: text("expected_impact"),
     supporting_session_ids: supporting,
     metric_evidence: metricEvidence,
@@ -613,22 +629,23 @@ async function discoverInsights(
     }
   });
   const bestByTitle = new Map<string, DiscoveredInsight>();
-  let aggregateInsights: DiscoveredInsight[] = [];
+  let aggregateInsights = buildBaselineAggregateInsights(agentsViewStats, metrics);
   try {
     const response = await analyzeRecord(
       analyze,
       AGGREGATE_SYSTEM_PROMPT,
       `Analyze these computed aggregates:\n${JSON.stringify({ agentsview_stats: compactAggregateStats(agentsViewStats), projects, farpoint_metrics: metrics })}`,
     );
-    aggregateInsights = (Array.isArray(response?.insights) ? response.insights : [])
+    const generatedAggregateInsights = (Array.isArray(response?.insights) ? response.insights : [])
       .map((insight) => normalizeInsight(insight, [], new Set(), "aggregate"))
       .filter((insight): insight is DiscoveredInsight => Boolean(insight))
       .filter(
         (insight) => insight.evidence_basis === "aggregate" && insight.metric_evidence.length > 0,
       )
       .filter(isUsefulInsight);
+    aggregateInsights = [...aggregateInsights, ...generatedAggregateInsights];
   } catch {
-    aggregateInsights = [];
+    // Deterministic aggregate-only insights remain valid when the optional model pass fails.
   }
   for (const insight of [...aggregateInsights, ...results.flat()]) {
     const key = insight.title.toLowerCase().replace(/[^a-z0-9]/g, "");

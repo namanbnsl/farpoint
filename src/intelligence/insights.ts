@@ -189,6 +189,116 @@ export function isUsefulInsight(insight: DiscoveredInsight): boolean {
   );
 }
 
+function metric(root: unknown, ...path: string[]): number | undefined {
+  let value = root;
+  for (const key of path) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+    value = (value as Record<string, unknown>)[key];
+  }
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function aggregateInsight(
+  title: string,
+  observation: string,
+  metricEvidence: string[],
+  action: string,
+): DiscoveredInsight {
+  return scoreInsight({
+    title,
+    observation: `${observation} Aggregate-only; support: 0 inspected sessions.`,
+    why_it_matters:
+      "This computed corpus pattern remains useful without qualitative session evidence.",
+    contrast: "The comparison comes directly from the supplied aggregate metrics.",
+    competing_explanation: "Archive coverage or metric classification may affect the value.",
+    action,
+    confidence: "high",
+    confidence_score: 0.9,
+    support_count: 0,
+    expected_impact: "Keeps a measurable opportunity visible without inventing session evidence.",
+    supporting_session_ids: [],
+    metric_evidence: metricEvidence,
+    evidence: [],
+    evidence_basis: "aggregate",
+    lenses: ["project-health"],
+    score_components: {
+      surprise: 7,
+      evidence_strength: 10,
+      recurrence: 8,
+      actionable_impact: 8,
+      specificity: 10,
+    },
+  });
+}
+
+/** Metric-only baselines must survive an empty or failed model discovery pass. */
+export function buildBaselineAggregateInsights(
+  stats: unknown,
+  metrics: { by_agent: Record<string, Record<string, number>> },
+): DiscoveredInsight[] {
+  const insights: DiscoveredInsight[] = [];
+  const skills = metric(stats, "adoption", "distinct_skills");
+  if (skills !== undefined)
+    insights.push(
+      aggregateInsight(
+        skills === 0
+          ? "No agent skills are currently adopted"
+          : "Agent skills have an established baseline",
+        `The archive reports ${skills} distinct adopted skills.`,
+        [`agentsview_stats.adoption.distinct_skills = ${skills}`],
+        skills === 0
+          ? "Pilot one narrowly scoped provisional skill and measure its effect."
+          : "Audit skill coverage before adding overlapping instructions.",
+      ),
+    );
+  const agent = metrics.by_agent["antigravity-cli"];
+  const retries = metric(agent, "retries");
+  const sessions = metric(agent, "sessions");
+  const failures = metric(agent, "failures") ?? 0;
+  if (retries !== undefined && sessions !== undefined && retries > 0)
+    insights.push(
+      aggregateInsight(
+        "antigravity-cli has an unusually high retry rate",
+        `antigravity-cli recorded ${retries} retries across ${sessions} sessions, alongside ${failures} failures.`,
+        [
+          `farpoint_metrics.by_agent.antigravity-cli.sessions = ${sessions}`,
+          `farpoint_metrics.by_agent.antigravity-cli.retries = ${retries}`,
+          `farpoint_metrics.by_agent.antigravity-cli.failures = ${failures}`,
+        ],
+        "Inspect retry taxonomy and a small session sample before attributing a cause.",
+      ),
+    );
+  const quick = metric(stats, "archetypes", "quick");
+  const deep = metric(stats, "archetypes", "deep");
+  if (quick !== undefined && deep !== undefined && quick > deep)
+    insights.push(
+      aggregateInsight(
+        "Most sessions are short, quick interactions",
+        `The archive contains ${quick} quick sessions versus ${deep} deep sessions.`,
+        [
+          `agentsview_stats.archetypes.quick = ${quick}`,
+          `agentsview_stats.archetypes.deep = ${deep}`,
+        ],
+        "Sample both quick and deep cohorts when comparing behavior.",
+      ),
+    );
+  const saved = metric(stats, "cache_economics", "dollars_saved_vs_uncached");
+  const spent = metric(stats, "cache_economics", "dollars_spent");
+  if (saved !== undefined && spent !== undefined && saved > 0)
+    insights.push(
+      aggregateInsight(
+        "Prompt caching is producing measurable savings",
+        `Estimated cache savings are USD ${saved.toFixed(2)} against USD ${spent.toFixed(2)} spent.`,
+        [
+          `agentsview_stats.cache_economics.dollars_saved_vs_uncached = ${saved}`,
+          `agentsview_stats.cache_economics.dollars_spent = ${spent}`,
+        ],
+        "Preserve cache-friendly prompt structure and monitor these metrics over time.",
+      ),
+    );
+  return insights;
+}
+
 export function reconcileInsightEvidence(
   evidence: EvidenceReference[],
   validEvidence: EvidenceReference[],
