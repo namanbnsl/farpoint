@@ -2,6 +2,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { runAgentsView, syncAgentsView } from "../agentsview/runner";
+import { renderHtmlReport } from "../report/html";
 import { computeMetrics, paginateSessions, rankCandidates, selectCorpus } from "./corpus";
 import {
   buildBaselineAggregateInsights,
@@ -1063,7 +1064,9 @@ async function saveReport(report: AnalysisReport): Promise<string> {
   const directory = join(homedir(), ".farpoint", "reports", timestamp);
   await mkdir(directory, { recursive: true, mode: 0o700 });
   const path = join(directory, "analysis.json");
+  const htmlPath = join(directory, "report.html");
   await writeFile(path, `${JSON.stringify(report, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
+  await writeFile(htmlPath, renderHtmlReport(report), { encoding: "utf8", mode: 0o600 });
   return path;
 }
 

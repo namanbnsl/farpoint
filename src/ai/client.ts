@@ -121,5 +121,7 @@ export async function runSession(
   const { report, path } = await runFullCorpusAnalysis(analyze, (update) => {
     onActivity(update.label);
   });
-  onText(`${report.report_markdown}\n\n_Report saved to \`${path}\`._`);
+  onText(
+    `${report.report_markdown}\n\n_Report saved to \`${path}\`._\n_Interactive report saved beside it as \`report.html\`._`,
+  );
 }
