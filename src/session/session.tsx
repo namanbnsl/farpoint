@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Api, Model } from "@earendil-works/pi-ai";
+import { spawn } from "node:child_process";
 import { useApp, useInput } from "ink";
 import { runSession } from "../ai/client";
 import type { UserQuestion } from "../ai/questions";
@@ -17,12 +18,31 @@ type SessionProps = {
   onBack: () => void;
 };
 
+function openInBrowser(path: string): Promise<void> {
+  const [command, args] =
+    process.platform === "darwin"
+      ? ["open", [path]]
+      : process.platform === "win32"
+        ? ["cmd", ["/d", "/s", "/c", "start", "", path]]
+        : ["xdg-open", [path]];
+
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, { detached: true, stdio: "ignore" });
+    child.once("error", reject);
+    child.once("spawn", () => {
+      child.unref();
+      resolve();
+    });
+  });
+}
+
 export function Session({ model, onBack }: SessionProps) {
   const { exit } = useApp();
   const [reply, setReply] = useState("");
   const [status, setStatus] = useState<SessionStatus>("running");
   const [activities, setActivities] = useState<string[]>([]);
   const [error, setError] = useState("");
+  const [reportPath, setReportPath] = useState<string>();
   const [pendingQuestion, setPendingQuestion] = useState<PendingQuestion>();
   const [questionValue, setQuestionValue] = useState("");
   const [questionIndex, setQuestionIndex] = useState(0);
@@ -42,12 +62,13 @@ export function Session({ model, onBack }: SessionProps) {
     setStatus("running");
     setActivities([]);
     setError("");
+    setReportPath(undefined);
     setPendingQuestion(undefined);
     setQuestionValue("");
     setQuestionIndex(0);
 
     try {
-      await runSession(
+      const htmlPath = await runSession(
         model,
         (delta) => {
           setReply((current) => current + delta);
@@ -60,6 +81,7 @@ export function Session({ model, onBack }: SessionProps) {
         requestQuestion,
       );
 
+      setReportPath(htmlPath);
       setStatus("done");
     } catch (cause) {
       setError(messageFromError(cause));
@@ -120,6 +142,11 @@ export function Session({ model, onBack }: SessionProps) {
         onBack();
       } else if (input.toLowerCase() === "r") {
         void start();
+      } else if (input.toLowerCase() === "o" && reportPath) {
+        setError("");
+        void openInBrowser(reportPath).catch((cause) => {
+          setError(`Could not open the report: ${messageFromError(cause)}`);
+        });
       } else if (key.return || input === "q") {
         exit();
       }
@@ -137,6 +164,7 @@ export function Session({ model, onBack }: SessionProps) {
       questionValue={questionValue}
       questionIndex={questionIndex}
       onQuestionChange={setQuestionValue}
+      canOpenReport={Boolean(reportPath)}
     />
   );
 }

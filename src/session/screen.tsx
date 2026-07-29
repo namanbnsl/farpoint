@@ -15,6 +15,7 @@ type SessionScreenProps = {
   questionValue: string;
   questionIndex: number;
   onQuestionChange: (value: string) => void;
+  canOpenReport: boolean;
 };
 
 export function SessionScreen({
@@ -27,6 +28,7 @@ export function SessionScreen({
   questionValue,
   questionIndex,
   onQuestionChange,
+  canOpenReport,
 }: SessionScreenProps) {
   return (
     <Shell>
@@ -91,7 +93,13 @@ export function SessionScreen({
         </Box>
       ) : null}
       {error ? <Text color={theme.danger}>{error}</Text> : null}
-      {status !== "running" ? <Hint>enter finish · r retry · esc models</Hint> : null}
+      {status !== "running" ? (
+        <Hint>
+          {canOpenReport
+            ? "o open report · enter finish · r retry · esc models"
+            : "enter finish · r retry · esc models"}
+        </Hint>
+      ) : null}
     </Shell>
   );
 }

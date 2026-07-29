@@ -48,6 +48,8 @@ Separate observed behavior from hypotheses. Give concrete session-level advice.`
 
 const DISCOVERY_SYSTEM_PROMPT = `You are an investigative researcher of coding-agent behavior.
 Return JSON only: {"insights":[...]}. Hunt for non-obvious, useful findings through the assigned lenses.
+Return two to four distinct findings for the cohort when the evidence supports them; prefer
+different phenomena over paraphrases of the same observation.
 Each insight requires: title, observation, why_it_matters, contrast, competing_explanation,
 action, confidence, expected_impact, supporting_session_ids, evidence, lenses, and
 score_components with 0-10 surprise, evidence_strength, recurrence, actionable_impact,
@@ -56,7 +58,8 @@ than three sessions. Use only supplied evidence references.`;
 const AGGREGATE_SYSTEM_PROMPT = `You analyze authoritative computed metrics, not transcripts.
 Return JSON only: {"insights":[...]}, using the same insight schema as the qualitative pass.
 Find material anomalies, ratios, outliers, agent differences, temporal patterns, context pressure,
-and project-level patterns. Return two to five high-value findings. Every claim must include
+and project-level patterns. Return four to eight high-value findings across distinct subjects,
+including at least two project-level findings when project data supports them. Every claim must include
 metric_evidence[] containing exact JSON paths and values from the supplied packet. These are
 aggregate-only insights: set evidence to [] and supporting_session_ids to []. Never borrow a
 session excerpt merely to make an aggregate claim look cited. Describe correlations, not invented
@@ -792,7 +795,7 @@ async function discoverInsights(
     if (!existing || insight.score > existing.score) bestByTitle.set(key, insight);
   }
   return linkAggregateSessionEvidence(
-    [...bestByTitle.values()].sort((a, b) => b.score - a.score).slice(0, 12),
+    [...bestByTitle.values()].sort((a, b) => b.score - a.score).slice(0, 18),
     findings,
   );
 }
@@ -1122,7 +1125,7 @@ export async function runFullCorpusAnalysis(
     analyze,
   );
 
-  onProgress({ stage: "synthesizing", label: "Synthesizing evidence-backed advice" });
+  onProgress({ stage: "synthesizing", label: "Structuring the evidence-backed report" });
   const report = await synthesize(
     {
       schema_version: 1,

@@ -1,6 +1,8 @@
 import { Agent } from "@earendil-works/pi-agent-core";
 import type { Api, AuthInteraction, Model } from "@earendil-works/pi-ai";
 import { builtinModels } from "@earendil-works/pi-ai/providers/all";
+import { dirname, join } from "node:path";
+import { pathToFileURL } from "node:url";
 import {
   beginAgentsViewAnalysis,
   getAgentsViewAvailability,
@@ -60,7 +62,7 @@ export async function runSession(
   onText: (delta: string) => void,
   onActivity: (label: string) => void,
   requestQuestion: RequestUserQuestion,
-): Promise<void> {
+): Promise<string | undefined> {
   beginAgentsViewAnalysis();
   const availability = await getAgentsViewAvailability();
   if (!availability.installed) {
@@ -75,7 +77,7 @@ export async function runSession(
       onText(
         "Farpoint cannot analyze sessions until the local AgentsView data source is available.",
       );
-      return;
+      return undefined;
     }
     onActivity("Preparing local session data");
     await installAgentsView();
@@ -118,10 +120,10 @@ export async function runSession(
     return text;
   };
 
-  const { report, path } = await runFullCorpusAnalysis(analyze, (update) => {
+  const { path } = await runFullCorpusAnalysis(analyze, (update) => {
     onActivity(update.label);
   });
-  onText(
-    `${report.report_markdown}\n\n_Report saved to \`${path}\`._\n_Interactive report saved beside it as \`report.html\`._`,
-  );
+  const htmlPath = join(dirname(path), "report.html");
+  onText(`[${htmlPath}](${pathToFileURL(htmlPath).href})`);
+  return htmlPath;
 }
