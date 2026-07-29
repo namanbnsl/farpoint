@@ -21,10 +21,17 @@ import type {
 } from "./types";
 
 type AnalyzeText = (systemPrompt: string, prompt: string) => Promise<string>;
-type Message = { ordinal?: number; role?: string; content?: string };
+type Message = {
+  ordinal?: number | string;
+  role?: string;
+  content?: unknown;
+  text?: unknown;
+  message?: unknown;
+};
 type MessagePage = { messages?: Message[] };
 
-const TRIAGE_BATCH_SIZE = 10;
+// Keep serialized batches below MAX_PROMPT_CHARS so JSON is never sliced mid-packet.
+const TRIAGE_BATCH_SIZE = 5;
 const INITIAL_CANDIDATES = 50;
 const DEEP_INSPECTION_LIMIT = 18;
 const MAX_WORKERS = 3;
@@ -43,7 +50,11 @@ ordinal_end, excerpt, and signal_type. Use only supplied messages. Keep excerpts
 
 const DEEP_SYSTEM_PROMPT = `You are a forensic coding-session analyst. Return one JSON
 SessionFinding only, using the supplied targeted transcript windows and metadata.
-Every qualitative conclusion must cite an exact supplied ordinal and bounded excerpt.
+Return session_id, outcome_assessment, task_type, prompting_pattern, friction,
+recurring_mistakes, strengths, user_preferences, themes, advice, confidence, and evidence.
+Each evidence item must contain session_id, ordinal_start, ordinal_end, excerpt, and
+signal_type. Every qualitative conclusion must cite an exact supplied ordinal and bounded excerpt.
+Return at least one evidence item when substantive messages are supplied.
 Separate observed behavior from hypotheses. Give concrete session-level advice.`;
 
 const DISCOVERY_SYSTEM_PROMPT = `You are an investigative researcher of coding-agent behavior.
@@ -277,7 +288,21 @@ function compactAggregateStats(value: unknown): Record<string, unknown> {
   );
 }
 
-function cleanMessageContent(content: string | undefined): string {
+function messageText(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) return value.map(messageText).filter(Boolean).join("\n");
+  const item = asRecord(value);
+  if (!item) return "";
+  for (const key of ["text", "content", "message", "value"]) {
+    const text = messageText(item[key]);
+    if (text) return text;
+  }
+  return "";
+}
+
+function cleanMessageContent(message: Message): string {
+  const content =
+    messageText(message.content) || messageText(message.text) || messageText(message.message);
   if (!content) return "";
   return content
     .replace(/^\[Message\]\s+(?:\w+=\S+\s+)*content=/, "")
@@ -341,16 +366,17 @@ async function fetchMessages(args: string[]): Promise<Message[]> {
 function compactMessages(messages: Message[]): Message[] {
   const seen = new Set<number>();
   return messages
+    .map((message) => ({ ...message, ordinal: Number(message.ordinal) }))
     .filter((message) => {
-      if (typeof message.ordinal !== "number" || seen.has(message.ordinal)) return false;
-      seen.add(message.ordinal);
+      if (!Number.isInteger(message.ordinal) || seen.has(message.ordinal as number)) return false;
+      seen.add(message.ordinal as number);
       return true;
     })
     .sort((a, b) => (a.ordinal ?? 0) - (b.ordinal ?? 0))
     .map((message) => ({
       ordinal: message.ordinal,
       role: message.role,
-      content: bounded(cleanMessageContent(message.content), 320),
+      content: bounded(cleanMessageContent(message), 320),
     }));
 }
 
@@ -392,14 +418,16 @@ async function buildTriagePacket(candidate: SessionCandidate) {
 
 function isEvidence(value: unknown, sessionIds: Set<string>): value is EvidenceReference {
   const item = asRecord(value);
+  const ordinalStart = Number(item?.ordinal_start);
+  const ordinalEnd = Number(item?.ordinal_end ?? item?.ordinal_start);
   return Boolean(
     item &&
     typeof item.session_id === "string" &&
     sessionIds.has(item.session_id) &&
-    typeof item.ordinal_start === "number" &&
-    typeof item.ordinal_end === "number" &&
-    typeof item.excerpt === "string" &&
-    item.excerpt.length <= MAX_EXCERPT,
+    Number.isInteger(ordinalStart) &&
+    Number.isInteger(ordinalEnd) &&
+    (item.excerpt === undefined ||
+      (typeof item.excerpt === "string" && item.excerpt.length <= MAX_EXCERPT)),
   );
 }
 
@@ -413,7 +441,15 @@ function normalizeFinding(
   if (!candidate || !item) return undefined;
   const validIds = new Set([sessionId]);
   const evidence = Array.isArray(item.evidence)
-    ? item.evidence.filter((entry) => isEvidence(entry, validIds)).slice(0, 12)
+    ? item.evidence
+        .filter((entry) => isEvidence(entry, validIds))
+        .map((entry) => ({
+          ...entry,
+          ordinal_start: Number(entry.ordinal_start),
+          ordinal_end: Number(entry.ordinal_end ?? entry.ordinal_start),
+          excerpt: typeof entry.excerpt === "string" ? entry.excerpt : "",
+        }))
+        .slice(0, 12)
     : [];
   return {
     session_id: sessionId,
@@ -500,7 +536,7 @@ function reconcileEvidence(
       {
         ...item,
         ordinal_end: messages.has(item.ordinal_end) ? item.ordinal_end : item.ordinal_start,
-        excerpt: bounded(source.content, MAX_EXCERPT),
+        excerpt: bounded(cleanMessageContent(source), MAX_EXCERPT),
       },
     ];
   });
@@ -1112,7 +1148,10 @@ export async function runFullCorpusAnalysis(
   const candidateMap = new Map(
     ranked.slice(0, candidateCount).map((candidate) => [candidate.id, candidate]),
   );
-  const deep = await inspectDeeply(triage, candidateMap, analyze, onProgress);
+  const inspected = await inspectDeeply(triage, candidateMap, analyze, onProgress);
+  // Evidence-free model output is an attempted inspection, not a successful close read.
+  // Excluding it here prevents empty placeholders from becoming profile or insight input.
+  const deep = inspected.filter((finding) => finding.evidence.length > 0);
   const evidence = deep.flatMap((finding) => finding.evidence);
 
   onProgress({ stage: "discovering", label: "Mining surprising cross-session insights" });
