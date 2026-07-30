@@ -151,6 +151,34 @@ export function computeMetrics(sessions: SessionSummary[]): NumericSummary {
   };
 }
 
+export function reconcileAgentTokenStats(value: unknown, sessions: SessionSummary[]): unknown {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+
+  const byTokens: Record<string, number> = {};
+  for (const session of sessions) {
+    const tokens = numberValue(session, "total_output_tokens");
+    if (tokens <= 0) continue;
+    const agent = session.agent || "unknown";
+    byTokens[agent] = (byTokens[agent] ?? 0) + tokens;
+  }
+  if (Object.keys(byTokens).length === 0) return value;
+
+  const stats = value as Record<string, unknown>;
+  const portfolio =
+    stats.agent_portfolio &&
+    typeof stats.agent_portfolio === "object" &&
+    !Array.isArray(stats.agent_portfolio)
+      ? (stats.agent_portfolio as Record<string, unknown>)
+      : {};
+  return {
+    ...stats,
+    agent_portfolio: {
+      ...portfolio,
+      by_tokens: byTokens,
+    },
+  };
+}
+
 function recencyScore(session: SessionSummary): number {
   const timestamp = Date.parse(session.ended_at ?? session.started_at ?? "");
   if (!Number.isFinite(timestamp)) return 0;

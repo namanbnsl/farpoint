@@ -203,18 +203,22 @@ function aggregateInsight(
   observation: string,
   metricEvidence: string[],
   action: string,
+  why: string,
+  contrast: string,
+  alternative: string,
+  impact: string,
 ): DiscoveredInsight {
   return scoreInsight({
     title,
     observation: `${observation} Aggregate-only; support: 0 inspected sessions.`,
-    why_it_matters: `${title} changes the next useful measurement or intervention: ${action}`,
-    contrast: `The archive-wide comparison behind this finding is: ${observation}`,
-    competing_explanation: `For ${title}, incomplete instrumentation or cohort classification could account for part of the measured difference.`,
+    why_it_matters: why,
+    contrast,
+    competing_explanation: alternative,
     action,
     confidence: "high",
     confidence_score: 0.9,
     support_count: 0,
-    expected_impact: `Makes the next check concrete: ${action}`,
+    expected_impact: impact,
     supporting_session_ids: [],
     metric_evidence: metricEvidence,
     evidence: [],
@@ -248,6 +252,14 @@ export function buildBaselineAggregateInsights(
         skills === 0
           ? "Pilot one narrowly scoped provisional skill and measure its effect."
           : "Audit skill coverage before adding overlapping instructions.",
+        skills === 0
+          ? "There is no measured baseline for whether reusable instructions reduce repeated corrections."
+          : "Existing reusable instructions should be checked before another overlapping rule is introduced.",
+        skills === 0
+          ? "The archive records agent use but no adopted skills, so future skill impact can be measured from zero."
+          : `The archive already detects ${skills} distinct skills, so the question is coverage rather than initial adoption.`,
+        "Skills may exist outside the locations covered by the archive's adoption scanner.",
+        "Creates a measurable experiment without introducing several untracked rules at once.",
       ),
     );
   const agent = metrics.by_agent["antigravity-cli"];
@@ -265,6 +277,10 @@ export function buildBaselineAggregateInsights(
           `farpoint_metrics.by_agent.antigravity-cli.failures = ${failures}`,
         ],
         "Inspect retry taxonomy and a small session sample before attributing a cause.",
+        "Retries can mark productive iteration or avoidable rework; the aggregate count alone cannot distinguish them.",
+        `${retries} retries across ${sessions} antigravity-cli sessions is the relevant rate, while ${failures} failures are a separate signal.`,
+        "The agent adapter may classify ordinary continuation messages as retries more often than other adapters.",
+        "Separates instrumentation noise from workflow friction before changing agent routing.",
       ),
     );
   const quick = metric(stats, "archetypes", "quick");
@@ -279,6 +295,10 @@ export function buildBaselineAggregateInsights(
           `agentsview_stats.archetypes.deep = ${deep}`,
         ],
         "Sample both quick and deep cohorts when comparing behavior.",
+        "A short-session majority can make broad averages describe quick lookups rather than sustained project work.",
+        `${quick} quick sessions outnumber ${deep} deep sessions, so an unstratified comparison weights quick work more heavily.`,
+        "Session boundaries may split one longer workflow into several interactions classified as quick.",
+        "Stratified samples keep short requests from masking longer implementation behavior.",
       ),
     );
   const saved = metric(stats, "cache_economics", "dollars_saved_vs_uncached");
@@ -293,6 +313,10 @@ export function buildBaselineAggregateInsights(
           `agentsview_stats.cache_economics.dollars_spent = ${spent}`,
         ],
         "Preserve cache-friendly prompt structure and monitor these metrics over time.",
+        "Measured savings make prompt-cache stability an operational concern rather than a theoretical optimization.",
+        `The archive attributes USD ${saved.toFixed(2)} to caching alongside USD ${spent.toFixed(2)} in priced spend.`,
+        "Pricing coverage may exclude agents or models without token-cost telemetry, making the totals incomplete.",
+        "Monitoring the same priced cohort can reveal regressions without overstating archive-wide savings.",
       ),
     );
   return insights;

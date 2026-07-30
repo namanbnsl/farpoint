@@ -32,6 +32,12 @@ const preferredProviderIds = [
   "cerebras",
 ];
 
+const disallowedModelIds = new Set(["gpt-5.3-codex-spark"]);
+
+export function isModelAllowed(model: Model<Api>): boolean {
+  return !disallowedModelIds.has(model.id);
+}
+
 function availableAuthMethods(provider: Provider): AuthMethod[] {
   const methods: AuthMethod[] = [];
   if (provider.auth.oauth) methods.push("oauth");

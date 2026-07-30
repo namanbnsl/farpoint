@@ -6,6 +6,7 @@ import {
   buildProviderOptions,
   filterModels,
   filterProviders,
+  isModelAllowed,
   type AuthMethod,
   type ProviderId,
   type ProviderOption,
@@ -106,6 +107,7 @@ export function Onboarding({ onComplete }: { onComplete: (model: Model<Api>) => 
     const providerModels = modelRegistry
       .getModels(providerId)
       .filter((model) => model.provider === providerId)
+      .filter(isModelAllowed)
       .sort((a, b) => a.name.localeCompare(b.name));
     if (providerModels.length === 0) {
       setError(`Pi did not return any models for ${providerId}.`);

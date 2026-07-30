@@ -3,7 +3,13 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { runAgentsView, syncAgentsView } from "../agentsview/runner";
 import { renderHtmlReport } from "../report/html";
-import { computeMetrics, paginateSessions, rankCandidates, selectCorpus } from "./corpus";
+import {
+  computeMetrics,
+  paginateSessions,
+  rankCandidates,
+  reconcileAgentTokenStats,
+  selectCorpus,
+} from "./corpus";
 import {
   buildBaselineAggregateInsights,
   buildDiscoveryCohorts,
@@ -50,8 +56,10 @@ ordinal_end, excerpt, and signal_type. Use only supplied messages. Keep excerpts
 
 const DEEP_SYSTEM_PROMPT = `You are a forensic coding-session analyst. Return one JSON
 SessionFinding only, using the supplied targeted transcript windows and metadata.
-Return session_id, outcome_assessment, task_type, prompting_pattern, friction,
+Return session_id, title, outcome_assessment, task_type, prompting_pattern, friction,
 recurring_mistakes, strengths, user_preferences, themes, advice, confidence, and evidence.
+Write a short descriptive title from the actual task when the metadata title is empty or merely
+repeats the agent name and raw session id.
 Each evidence item must contain session_id, ordinal_start, ordinal_end, excerpt, and
 signal_type. Every qualitative conclusion must cite an exact supplied ordinal and bounded excerpt.
 Return at least one evidence item when substantive messages are supplied.
@@ -79,7 +87,8 @@ material.`;
 
 const SYNTHESIS_SYSTEM_PROMPT = `You are Farpoint, a precise coding-agent improvement
 analyst. Return JSON only matching the requested schema. Numerical metrics are
-authoritative. Every qualitative claim must state its support count in the claim itself.
+authoritative. Keep support counts and session ids only in supporting_session_ids; never repeat
+them in the human-readable claim.
 Only call something a repeated user pattern when at least three distinct session ids support
 it; otherwise label it session-specific or tentative. Never write "the user is", "always",
 or equivalent universal language from a sample. Do not invent evidence, prices, costs, or
@@ -102,7 +111,10 @@ session supports it.`;
 const PROFILE_SYSTEM_PROMPT = `You infer a bounded user profile from supplied session findings.
 Return JSON only with user_profile buckets: repeated_preferences, working_style,
 recurring_corrections, strengths, and failure_modes. Each bucket contains claim and
-supporting_session_ids. Use exact supplied ids. Do not generalize beyond the evidence; a claim
+supporting_session_ids. Use exact supplied ids in supporting_session_ids, never in claim text.
+Write claims directly to the reader in grammatical second person ("you prefer", not
+"the user prefers" or "you prefers").
+Do not generalize beyond the evidence; a claim
 with fewer than three supporting sessions is tentative, not repeated.`;
 
 const MATCH_STOP_WORDS = new Set([
@@ -431,6 +443,20 @@ function isEvidence(value: unknown, sessionIds: Set<string>): value is EvidenceR
   );
 }
 
+function isRawSessionTitle(title: string, sessionId: string, agent: string): boolean {
+  const normalizedTitle = title.trim().toLowerCase();
+  if (!normalizedTitle) return true;
+
+  const normalizedId = sessionId.trim().toLowerCase();
+  if (normalizedTitle === normalizedId) return true;
+
+  const withoutIdentity = normalizedTitle
+    .replaceAll(normalizedId, "")
+    .replaceAll(agent.trim().toLowerCase(), "")
+    .replace(/[\s:|/·—–_-]+/g, "");
+  return normalizedTitle.includes(normalizedId) && withoutIdentity.length === 0;
+}
+
 function normalizeFinding(
   value: unknown,
   candidates: Map<string, SessionCandidate>,
@@ -451,9 +477,17 @@ function normalizeFinding(
         }))
         .slice(0, 12)
     : [];
+  const archiveTitle = candidate.display_name?.trim() ?? "";
+  const generatedTitle =
+    typeof item.title === "string" ? bounded(cleanGeneratedText(item.title), 160) : "";
+  const agent = candidate.agent ?? "";
+  const archiveTitleIsRaw = isRawSessionTitle(archiveTitle, sessionId, agent);
+  const generatedTitleIsUseful =
+    Boolean(generatedTitle) && !isRawSessionTitle(generatedTitle, sessionId, agent);
   return {
     session_id: sessionId,
-    title: candidate.display_name ?? sessionId,
+    title:
+      archiveTitleIsRaw && generatedTitleIsUseful ? generatedTitle : archiveTitle || generatedTitle,
     project: candidate.project ?? "unknown",
     agent: candidate.agent ?? "unknown",
     outcome_assessment:
@@ -853,16 +887,36 @@ function fallbackMarkdown(report: Omit<AnalysisReport, "report_markdown">): stri
   ].join("\n");
 }
 
+const SECOND_PERSON_VERBS: Readonly<Record<string, string>> = {
+  appears: "appear",
+  asks: "ask",
+  corrects: "correct",
+  expects: "expect",
+  gives: "give",
+  has: "have",
+  prefers: "prefer",
+  provides: "provide",
+  tends: "tend",
+  wants: "want",
+};
+
 function cleanProfileClaim(text: string): string {
-  return bounded(cleanGeneratedText(text), 800).replace(
-    /\((\d+) sessions?: ([^)]+)\)/gi,
-    (label, count: string, names: string) => {
-      const projects = [...new Set(names.split(",").map((name) => name.trim()))];
-      return projects.length < names.split(",").length
-        ? `(${count} sessions across ${projects.join(", ")})`
-        : label;
-    },
-  );
+  return bounded(cleanGeneratedText(text), 800)
+    .replace(/\s*\(\d+ (?:supporting )?sessions?:[^)]*\)\.?$/i, "")
+    .replace(
+      /\s*[,;—-]?\s*(?:supported by|support(?:ed)?(?: across| in|:)?|seen in)\s+\d+\s+(?:supporting\s+)?sessions?\s*:\s*\S[\s\S]*$/i,
+      "",
+    )
+    .replace(/\bthe user's\b/gi, "your")
+    .replace(/\bthe user\b/gi, "you")
+    .replace(
+      /\byou((?:\s+(?:often|repeatedly|usually|sometimes|generally|also))*)\s+([a-z]+)\b/gi,
+      (match, modifiers: string, verb: string) => {
+        const corrected = SECOND_PERSON_VERBS[verb.toLowerCase()];
+        return corrected ? `you${modifiers} ${corrected}` : match;
+      },
+    )
+    .trim();
 }
 
 function buildUserProfile(
@@ -1117,19 +1171,31 @@ export async function runFullCorpusAnalysis(
   await syncAgentsView();
 
   onProgress({ stage: "indexing", label: "Indexing all agent sessions" });
-  const [allSessions, agentsViewStats, projects] = await Promise.all([
-    paginateSessions(["--include-children", "--include-one-shot", "--include-automated"]),
+  const allSessions = await paginateSessions([
+    "--include-children",
+    "--include-one-shot",
+    "--include-automated",
+  ]);
+  const earliestSessionDate = allSessions
+    .flatMap((session) => {
+      const timestamp = Date.parse(session.started_at ?? session.ended_at ?? "");
+      return Number.isFinite(timestamp) ? [timestamp] : [];
+    })
+    .sort((a, b) => a - b)[0];
+  const statsSince = new Date(earliestSessionDate ?? Date.now()).toISOString().slice(0, 10);
+  const [rawAgentsViewStats, projects] = await Promise.all([
     runAgentsView([
       "stats",
       "--format",
       "json",
       "--since",
-      "1970-01-01",
+      statsSince,
       "--include-one-shot",
       "--include-automated",
     ]),
     runAgentsView(["projects", "--format", "json"]),
   ]);
+  const agentsViewStats = reconcileAgentTokenStats(rawAgentsViewStats, allSessions);
   const corpus = selectCorpus(allSessions);
 
   onProgress({
