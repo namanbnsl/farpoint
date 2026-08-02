@@ -1,245 +1,336 @@
-import type { AnalysisReport } from "../intelligence/types";
+import type { AnalysisReport } from "../intelligence/types.js";
 
 function serialize(value: unknown): string {
   return JSON.stringify(value)
     .replace(/</g, "\\u003c")
     .replace(/>/g, "\\u003e")
-    .replace(/&/g, "\\u0026");
+    .replace(/&/g, "\\u0026")
+    .replace(/\u2028/g, "\\u2028")
+    .replace(/\u2029/g, "\\u2029");
 }
 
 export function renderHtmlReport(report: AnalysisReport): string {
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>Farpoint · usage report</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<style>
-:root{
-  --paper:#ffffff; --surface:#f6f6f7; --surface-2:#eef0f2;
-  --ink:#15161a; --muted:#6b6f76; --faint:#9a9ea5; --line:#e6e7ea;
-  --accent:#2454e6; --accent-soft:#eaf0fe;
-  --good:#1f7a52; --warn:#a5620a;
-  --sans:'Inter',ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
-}
-*{box-sizing:border-box}
-html{scroll-behavior:smooth}
-@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important;animation:none!important}}
-body{margin:0;background:var(--paper);color:var(--ink);font:14.5px/1.65 var(--sans);-webkit-font-smoothing:antialiased}
-a{color:var(--accent)}
-:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-button,input,select{font:inherit;color:inherit}
-
-.head{position:sticky;top:0;z-index:5;background:var(--paper);border-bottom:1px solid var(--line)}
-.head-row{max-width:1080px;margin:auto;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px}
-.mark{font:600 13px/1 var(--mono);letter-spacing:.02em}
-.mark span{color:var(--faint);font-weight:400;margin-left:8px}
-.head-meta{display:flex;align-items:center;gap:14px;color:var(--faint);font:12px var(--mono)}
-.btn{border:1px solid var(--line);background:var(--paper);border-radius:6px;padding:6px 11px;font:12px var(--sans);font-weight:500;cursor:pointer}
-.btn:hover{border-color:var(--ink)}
-.export{position:relative}.export-menu{position:absolute;right:0;top:calc(100% + 7px);width:190px;padding:6px;background:var(--paper);border:1px solid var(--line);border-radius:8px;box-shadow:0 14px 40px rgba(20,22,26,.12)}.export-menu[hidden]{display:none}.export-menu button{display:block;width:100%;border:0;background:transparent;text-align:left;border-radius:5px;padding:8px 9px;font-size:12.5px;cursor:pointer}.export-menu button:hover{background:var(--surface)}
-
-.nav{max-width:1080px;margin:auto;padding:0 24px;display:flex;gap:4px;overflow-x:auto}
-.nav a{white-space:nowrap;text-decoration:none;color:var(--muted);font-size:12px;font-weight:500;padding:9px 10px;border-bottom:2px solid transparent}
-.nav a.active,.nav a:hover{color:var(--ink);border-color:var(--ink)}
-
-main{max-width:1080px;margin:auto;padding:36px 24px 100px}
-
-.lede{font-size:16px;line-height:1.65;color:var(--ink);max-width:760px;margin:0 0 28px}
-.lede b{font-weight:600}
-
-.stats{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--line);border-radius:8px;overflow:hidden}
-.stat{padding:16px 18px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--paper)}
-.stat:nth-child(3n){border-right:0}
-.stat:nth-last-child(-n+3){border-bottom:0}
-.stat b{display:block;font:600 22px/1.1 var(--mono);letter-spacing:-.01em}
-.stat span{display:block;margin-top:6px;color:var(--muted);font-size:12px;font-weight:600}
-.stat small{display:block;margin-top:3px;color:var(--faint);font-size:11.5px}
-.stat.flag b{color:var(--warn)}
-
-.explainer{margin-top:20px;padding:16px 18px;border:1px solid var(--line);border-radius:8px;background:var(--surface);font-size:13.5px;color:var(--muted);line-height:1.7}
-.explainer b{color:var(--ink)}
-
-.analytics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;margin-top:28px}
-.panel{padding:24px;border:0;border-radius:10px;background:var(--surface)}
-.panel.wide{grid-column:1/-1}
-.panel-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:20px}
-.panel h3{margin:0;font-size:13.5px}
-.panel-note{color:var(--faint);font-size:11px}
-.costs{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
-.cost{padding:16px;background:var(--paper);border-radius:6px}
-.cost b{display:block;font:600 18px var(--mono)}
-.cost span{display:block;margin-top:4px;color:var(--muted);font-size:11px}
-.bar-list{display:grid;gap:10px}
-.bar-label{display:flex;justify-content:space-between;gap:12px;margin-bottom:4px;font-size:12px}
-.bar-label span:last-child{color:var(--faint);font:11px var(--mono)}
-.bar-track{height:5px;background:var(--surface-2);border-radius:99px;overflow:hidden}
-.bar-fill{height:100%;background:var(--accent);border-radius:inherit}
-.routing{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
-.route{padding:16px;background:var(--paper);border-radius:6px}
-.route span{display:block;color:var(--faint);font:10px var(--mono);text-transform:uppercase;letter-spacing:.05em}
-.route b{display:block;margin-top:4px;font-size:12.5px}
-.route small{display:block;margin-top:3px;color:var(--muted);font-size:11px}
-
-.section{margin-top:60px;scroll-margin-top:96px}
-.section-head{display:flex;align-items:baseline;justify-content:space-between;gap:20px;padding-bottom:12px;border-bottom:1px solid var(--ink)}
-.section-head h2{margin:0;font:600 17px var(--sans);letter-spacing:-.01em}
-.count{color:var(--faint);font:12px var(--mono)}
-.note{margin:12px 0 0;color:var(--muted);font-size:13.5px;max-width:680px;line-height:1.6}
-
-.projects{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:18px}.project-card{border:1px solid var(--line);border-radius:10px;padding:17px;background:linear-gradient(145deg,var(--paper),#fafafb)}.project-top{display:flex;justify-content:space-between;align-items:start;gap:12px}.project-card h3{margin:0;font-size:14px}.project-meta{font:11px var(--mono);color:var(--faint)}.project-numbers{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:15px}.project-number{padding:10px;background:var(--surface);border-radius:6px}.project-number b{display:block;font:600 16px var(--mono)}.project-number span{font-size:10.5px;color:var(--muted)}.project-themes{margin:13px 0 0;color:var(--muted);font-size:12.5px}.project-link{margin-top:12px;border:0;background:transparent;color:var(--accent);padding:0;font-size:12px;cursor:pointer}
-
-.group{margin-top:28px}
-.group:first-child{margin-top:20px}
-.group-label{font:600 11px var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--faint);margin-bottom:10px}
-
-.tick{display:inline-flex;align-items:center;gap:6px;font:12px var(--sans);white-space:nowrap;color:var(--muted)}
-.tick span{background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:2px 8px;font-size:11px;color:var(--muted);font-weight:500}
-.tick span.all{color:var(--good);background:#eaf6ef;border-color:#cfe9da}
-
-.insight{border:1px solid var(--line);border-radius:8px;margin-top:10px;background:var(--paper)}
-.insight-row{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:16px;padding:15px 16px;cursor:pointer;list-style:none}
-.insight-row::-webkit-details-marker{display:none}
-.insight-title{font-weight:600;font-size:14px}
-.insight-obs{margin:4px 0 0;color:var(--muted);font-size:13px;max-width:600px;line-height:1.55}
-.fp-conf{font:12px var(--sans);font-weight:500;color:var(--muted);white-space:nowrap}
-.caret{color:var(--faint);font-size:11px}
-details[open] .caret{transform:rotate(180deg)}
-.insight-body{padding:2px 16px 18px;border-top:1px solid var(--line);display:grid;grid-template-columns:1fr 1fr;gap:16px 28px}
-.field h4{margin:14px 0 4px;font:600 10px var(--mono);text-transform:uppercase;letter-spacing:.05em;color:var(--faint)}
-.field p{margin:0;font-size:13px;line-height:1.55;color:var(--ink)}
-.evidence{grid-column:1/-1;margin-top:10px;padding:11px 12px;background:var(--surface);border-left:2px solid var(--accent);border-radius:0 4px 4px 0}
-.evidence p{margin:0;font:13px/1.6 var(--mono);color:var(--ink)}
-.evidence cite{display:block;margin-top:5px;color:var(--faint);font:11px var(--sans);font-style:normal}
-.evidence-list{grid-column:1/-1}
-.numbers{grid-column:1/-1;margin-top:10px;padding:11px 12px;background:var(--surface);border-left:2px solid var(--good);border-radius:0 4px 4px 0;font-size:12.5px;color:var(--ink)}
-.numbers b{font:600 13px var(--mono)}
-
-.toolbar{display:flex;gap:8px;margin-top:16px}
-.search{flex:1;max-width:380px;border:1px solid var(--line);border-radius:6px;padding:8px 11px;font-size:13px}
-.select{border:1px solid var(--line);border-radius:6px;padding:8px 11px;font-size:13px;background:var(--paper)}
-
-.table{margin-top:14px;border:1px solid var(--line);border-radius:8px;overflow:hidden}
-.row{display:grid;grid-template-columns:minmax(0,1.4fr) 110px 1fr 90px;gap:16px;align-items:center;padding:12px 14px;border-bottom:1px solid var(--line);background:var(--paper)}
-.row:last-child{border-bottom:0}
-.row[hidden]{display:none}
-.row-title b{display:block;font-size:13px;font-weight:600}
-.row-title span{color:var(--faint);font-size:11.5px}
-.row-agent{font-size:12px;color:var(--muted)}
-.row-type{color:var(--muted);font-size:12.5px}
-.row-open{border:1px solid var(--line);background:var(--paper);border-radius:5px;padding:5px 8px;font-size:11px;cursor:pointer;justify-self:end}
-.row-expand{grid-column:1/-1;display:none;padding-top:10px;font-size:13px}
-.row.open .row-expand{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-.row-expand h4{margin:0 0 4px;font:600 10px var(--mono);text-transform:uppercase;letter-spacing:.05em;color:var(--faint)}
-.row-expand p{margin:0 0 10px;color:var(--ink);line-height:1.55}.session-evidence{grid-column:1/-1;padding:10px 12px;background:var(--surface);border-radius:6px;color:var(--muted);font-size:12px}
-
-.profile{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}
-.profile-card{border:1px solid var(--line);border-radius:8px;padding:16px}
-.profile-card h3{margin:0 0 10px;font-size:13px;font-weight:600}
-.claim{padding:10px 0;border-top:1px solid var(--line)}
-.claim:first-of-type{border-top:0;padding-top:0}
-.claim p{margin:0 0 6px;font-size:13px;line-height:1.55}
-.empty{color:var(--faint);font-style:italic;font-size:12.5px}
-
-.recs{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px}
-.rec{border:1px solid var(--line);border-radius:8px;padding:16px}
-.rec-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
-.rec h3{margin:0;font-size:13.5px;font-weight:600}
-.tag{font:10px var(--mono);text-transform:uppercase;letter-spacing:.04em;color:var(--muted);background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:2px 6px}
-.tag.provisional{color:var(--warn);border-color:#eccf9b;background:#fbf3e4}
-.rec p{margin:10px 0 0;font-size:13px;color:var(--muted);line-height:1.55}
-.rec .rule{margin-top:10px;padding:9px 10px;background:var(--surface);border-left:2px solid var(--ink);font:12.5px/1.55 var(--mono);color:var(--ink)}
-.rec .tick{margin-top:10px}
-
-.limits{margin-top:26px;padding:14px 16px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
-.limits h3{margin:0 0 8px;font-size:12px;font-weight:600;color:var(--ink)}
-.limits ul{margin:0;padding-left:18px;color:var(--muted);font-size:13px;line-height:1.7}
-
-footer{max-width:1080px;margin:60px auto 0;padding:16px 24px;border-top:1px solid var(--line);color:var(--faint);font:12px var(--sans)}
-
-/* Quiet, spacious report surface. */
-.head{background:rgba(255,255,255,.92);border-bottom:1px solid rgba(21,22,26,.07);backdrop-filter:blur(14px)}
-.head-row,.nav{max-width:1160px;padding-left:32px;padding-right:32px}
-.head-row{padding-top:18px;padding-bottom:18px}
-.nav{gap:16px}
-.nav a{padding:11px 0;border-bottom-width:1px}
-main{max-width:1160px;padding:64px 32px 140px}
-.intro{max-width:760px;margin-bottom:76px}
-.eyebrow{margin-bottom:16px;color:var(--faint);font:600 10px var(--mono);letter-spacing:.1em;text-transform:uppercase}
-.intro h1{max-width:680px;margin:0;font-size:clamp(32px,5vw,54px);font-weight:600;line-height:1.08;letter-spacing:-.045em}
-.intro .lede{max-width:650px;margin:24px 0 0;color:var(--muted);font-size:16px;line-height:1.75}
-.section{margin-top:96px}
-.section-head{padding:0;border:0}
-.section-head h2{font-size:21px;letter-spacing:-.025em}
-.note{margin-top:9px;line-height:1.7}
-.stats{gap:12px;border:0;border-radius:0;overflow:visible}
-.stat{min-height:128px;padding:22px 20px;border:0!important;border-radius:10px;background:var(--surface)}
-.stat b{font-size:24px}
-.stat span{margin-top:10px}
-.stat small{margin-top:5px;line-height:1.5}
-.explainer{margin-top:24px;padding:24px;border:0;border-radius:10px;line-height:1.8}
-.bar-list{gap:14px}
-.projects{gap:20px;margin-top:28px}
-.project-card{padding:24px;border:0;border-radius:10px;background:var(--surface)}
-.project-numbers{gap:12px;margin-top:20px}
-.project-number{padding:14px;background:var(--paper)}
-.project-themes{margin-top:18px;line-height:1.7}
-.project-link{margin-top:16px}
-.group{margin-top:40px}
-.group-label{margin-bottom:16px}
-.insight{margin-top:12px;border:0;border-radius:10px;background:var(--surface)}
-.insight-row{gap:20px;padding:20px 22px}
-.insight-obs{margin-top:7px;line-height:1.65}
-.insight-body{padding:4px 22px 24px;border-top-color:rgba(21,22,26,.07);gap:20px 36px}
-.evidence,.numbers{margin-top:14px;padding:16px;border-left:0;border-radius:7px;background:var(--paper)}
-.profile{gap:20px;margin-top:28px}
-.profile-card{padding:24px;border:0;border-radius:10px;background:var(--surface)}
-.claim{padding:16px 0;border-color:rgba(21,22,26,.07)}
-.toolbar{gap:12px;margin-top:24px}
-.search,.select{padding:11px 13px;border-color:var(--line);border-radius:8px}
-.table{margin-top:18px;border:0;border-radius:0}
-.row{padding:18px 4px;border-color:var(--line)}
-.row-open{border:0;background:var(--surface);padding:7px 10px}
-.row-expand{padding-top:18px}
-.session-evidence{padding:16px;border-radius:7px}
-.limits{margin-top:28px;padding:22px;border:0;border-radius:10px}
-footer{max-width:1160px;margin-top:96px;padding:24px 32px 40px}
-@media(max-width:860px){
-  .head-row,.nav{padding-left:20px;padding-right:20px}
-  main{padding:48px 20px 100px}
-  .intro{margin-bottom:56px}
-  .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .insight-row{grid-template-columns:1fr auto}
-  .fp-conf{display:none}
-  .insight-body,.profile,.recs,.projects,.analytics{grid-template-columns:1fr}
-  .panel.wide{grid-column:auto}
-  .routing{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .row{grid-template-columns:1fr auto}
-  .row-agent,.row-type{display:none}
-}@media print{
-  .head,.nav,.toolbar,.row-open,.project-link{display:none}
-  details.insight{break-inside:avoid}
-  .row-expand{display:grid!important}
-  .section{break-inside:avoid}
-  main{padding:20px}
-}
-</style></head><body>
-<header class="head"><div class="head-row"><div class="mark">FARPOINT<span>usage report</span></div><div class="head-meta"><span id="generated"></span><div class="export"><button class="btn" id="export-toggle" type="button" aria-expanded="false">Export ▾</button><div class="export-menu" id="export-menu" hidden><button type="button" data-export="pdf">Print or save as PDF</button><button type="button" data-export="markdown">Download Markdown</button><button type="button" data-export="json">Download source JSON</button></div></div></div></div><nav class="nav" id="nav"></nav></header><main id="report"></main>
-<script id="report-data" type="application/json">${serialize(report)}</script><script>
-const R=JSON.parse(document.getElementById("report-data").textContent),$=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>[...r.querySelectorAll(s)],esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c])),num=n=>new Intl.NumberFormat("en-US",{notation:Math.abs(n)>=10000?"compact":"standard",maximumFractionDigits:1}).format(n||0),title=s=>String(s||"").replace(/_/g," ").replace(/\\b\\w/g,c=>c.toUpperCase());
-function human(s){if(!s)return s;const verbs={appears:"appear",asks:"ask",corrects:"correct",expects:"expect",gives:"give",has:"have",prefers:"prefer",provides:"provide",tends:"tend",wants:"want"};let t=String(s).replace(/^Session-specific(?: across \\d+ sessions?)?[,:]?\\s*/i,"").replace(/^Cross-project,?\\s*/i,"").replace(/\\s*\\(\\d+ (?:supporting )?sessions?:[^)]*\\)\\.?\\s*$/i,"").replace(/\\s*[,;—-]?\\s*(?:supported by|support(?:ed)?(?: across| in|:)?|seen in)\\s+\\d+\\s+(?:supporting\\s+)?sessions?\\s*:\\s*\\S[\\s\\S]*$/i,"").replace(/\\bthe user('s)?\\b/gi,(_,p)=>p?"your":"you").replace(/\\byou is\\b/gi,"you are").replace(/\\byou was\\b/gi,"you were").replace(/\\byou((?:\\s+(?:often|repeatedly|usually|sometimes|generally|also))*)\\s+([a-z]+)\\b/gi,(match,modifiers,verb)=>verbs[verb.toLowerCase()]?"you"+modifiers+" "+verbs[verb.toLowerCase()]:match).trim();return t.charAt(0).toUpperCase()+t.slice(1)}function excerpt(s){let t=String(s||""),m=t.match(/##\\s*My request for[^:]*:\\s*/i);if(m)t=t.slice(m.index+m[0].length);t=t.replace(/^#[^\\n]*\\n+/,"").replace(/\\s+/g," ").trim();return t.length>240?t.slice(0,237).trim()+"…":t}function project(s){const p=String(s||"unknown project").split(/[\\\\/]/).filter(Boolean).pop()||s;return String(p).replace(/[_-]+/g," ")}function tick(kind,count){return '<span class="tick"><span class="'+(kind==="aggregate"?"all":"")+'">'+(kind==="aggregate"?"computed from your whole history":"seen in "+count+" session"+(count===1?"":"s"))+'</span></span>'}
-$("#generated").textContent="Generated "+new Date(R.generated_at).toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"});const sections=[["stats","Overview"],["usage","Usage"],["projects","Projects"],["insights","Insights"],["profile","Profile"],["sessions","Sessions"]];$("#nav").innerHTML=sections.map(([id,label])=>'<a href="#'+id+'">'+label+'</a>').join("");
-const stats=R.agentsview_stats||{},cache=stats.cache_economics||{},saved=Number(cache.dollars_saved_vs_uncached||0),spent=Number(cache.dollars_spent||0),cacheHit=Number(cache.cache_hit_ratio?.overall||0),hasEconomics=spent>0||saved>0||cacheHit>0,hours=R.metrics.totals.duration_minutes/60,portfolio=stats.agent_portfolio||{},agentCounts=portfolio.by_sessions_human||portfolio.by_sessions||{},agentUsage=Object.entries(agentCounts).sort((a,b)=>b[1]-a[1]),agentTotal=agentUsage.reduce((sum,[,count])=>sum+count,0),topAgent=agentUsage[0]||['—',0],modelUsage=Object.entries(stats.model_mix?.by_tokens||{}).sort((a,b)=>b[1]-a[1]),modelTotal=modelUsage.reduce((sum,[,count])=>sum+count,0),toolUsage=Object.entries(stats.tool_mix?.by_category||{}).sort((a,b)=>b[1]-a[1]),toolTotal=Number(stats.tool_mix?.total_calls||0),money=n=>n?'$'+n.toFixed(2):'—',statData=[[num(R.coverage.eligible),'Sessions looked at',num(R.coverage.excluded_as_noise)+' quick/throwaway ones set aside'],[num(R.coverage.deeply_inspected),'Read in detail','source for behavioral and task-fit claims'],[num(R.metrics.totals.message_count),'Messages exchanged',num(R.metrics.averages.message_count)+' on average per session'],...(hasEconomics?[[money(spent),'Tracked API spend',cache.claude_only?'Claude-priced sessions only':'all priced sessions'],[money(saved),'Saved by prompt caching',saved&&spent?(saved/spent).toFixed(1)+'x tracked spend':'not available in this archive']]:[]),[topAgent[0],'Most-used agent',num(topAgent[1])+' human sessions'],[num(hours)+'h','Time recorded across sessions','includes idle time, not just active work'],[String(modelUsage.length),'Models used',modelUsage[0]?modelUsage[0][0]+' has the most tokens':'no token data'],...(hasEconomics?[[cacheHit?(cacheHit*100).toFixed(1)+'%':'—','Prompt cache hit rate',cache.claude_only?'Claude cache telemetry':'available cache telemetry']]:[])] ,statHtml=statData.map(([v,l,s])=>'<div class="stat"><b>'+esc(v)+'</b><span>'+esc(l)+'</span><small>'+esc(s)+'</small></div>').join('');
-function bars(entries,total,unit){return '<div class="bar-list">'+entries.slice(0,6).map(([name,value])=>'<div><div class="bar-label"><span>'+esc(name)+'</span><span>'+num(value)+' '+unit+' · '+(total?Math.round(value/total*100):0)+'%</span></div><div class="bar-track"><div class="bar-fill" style="width:'+(total?value/total*100:0)+'%"></div></div></div>').join('')+'</div>'}
-const taskTypes=[...new Set(R.session_findings.map(x=>x.task_type))].sort(),routeHtml=taskTypes.map(task=>{const counts={};R.session_findings.filter(x=>x.task_type===task).forEach(x=>counts[x.agent]=(counts[x.agent]||0)+1);const ranked=Object.entries(counts).sort((a,b)=>b[1]-a[1]),best=ranked[0]||['—',0],total=ranked.reduce((sum,[,count])=>sum+count,0);return '<div class="route"><span>'+esc(title(task))+'</span><b>'+esc(best[0])+'</b><small>'+best[1]+' of '+total+' inspected session'+(total===1?'':'s')+'</small></div>'}).join(''),economicsHtml=hasEconomics?'<div class="panel"><div class="panel-head"><h3>API economics</h3><span class="panel-note">'+esc(cache.claude_only?'Claude-priced sessions':'priced sessions')+'</span></div><div class="costs"><div class="cost"><b>'+money(spent)+'</b><span>spent</span></div><div class="cost"><b>'+money(saved)+'</b><span>cache savings</span></div><div class="cost"><b>'+money(spent+saved)+'</b><span>estimated uncached</span></div></div></div>':'',usageHtml='<div class="analytics">'+economicsHtml+'<div class="panel"><div class="panel-head"><h3>Most-used agents</h3><span class="panel-note">human sessions · full archive</span></div>'+bars(agentUsage,agentTotal,'sessions')+'</div><div class="panel wide"><div class="panel-head"><h3>Which agents you use for which jobs</h3><span class="panel-note">observed routing · inspected sessions, not a quality ranking</span></div><div class="routing">'+(routeHtml||'<p class="empty">No task mix available.</p>')+'</div></div><div class="panel"><div class="panel-head"><h3>Model mix</h3><span class="panel-note">tokens · full archive</span></div>'+bars(modelUsage,modelTotal,'tokens')+'</div><div class="panel"><div class="panel-head"><h3>Tool mix</h3><span class="panel-note">'+num(toolTotal)+' calls</span></div>'+bars(toolUsage,toolTotal,'calls')+'</div></div>';function insightCard(x){const aggregate=x.evidence_basis==="aggregate",count=(x.supporting_session_ids||[]).length,evid=(x.evidence||[]).slice(0,4).map(e=>'<div class="evidence"><p>"'+esc(excerpt(e.excerpt))+'"</p><cite>'+esc(e.title)+' · '+esc(project(e.project))+'</cite></div>').join(""),numbers=(x.metric_evidence||[]).length?'<div class="numbers">'+x.metric_evidence.map(esc).join("<br>")+'</div>':"";return '<details class="insight"><summary class="insight-row"><div><div class="insight-title">'+esc(human(x.title))+'</div><p class="insight-obs">'+esc(human(x.observation))+'</p></div>'+tick(aggregate?"aggregate":"session",count)+'<span class="caret">▾</span></summary><div class="insight-body"><div class="field"><h4>Why it matters</h4><p>'+esc(human(x.why_it_matters))+'</p></div><div class="field"><h4>Compared with</h4><p>'+esc(human(x.contrast))+'</p></div>'+evid+numbers+'</div></details>'}
-const patterns=R.discovered_insights.filter(x=>x.evidence_basis!=="aggregate"),numbers=R.discovered_insights.filter(x=>x.evidence_basis==="aggregate");
-const projectMetrics=Object.entries(R.metrics.by_project||{}).filter(([name])=>name!=="unknown").sort((a,b)=>b[1].sessions-a[1].sessions),projectCards=projectMetrics.map(([name,m])=>{const findings=R.session_findings.filter(x=>x.project===name),themes=[...new Set(findings.flatMap(x=>x.themes||[]))].slice(0,4),linked=R.discovered_insights.filter(x=>(x.evidence||[]).some(e=>e.project===name)||(x.metric_evidence||[]).some(v=>v.toLowerCase().includes(name.toLowerCase()))).length;return '<article class="project-card"><div class="project-top"><h3>'+esc(project(name))+'</h3><span class="project-meta">'+linked+' insight'+(linked===1?'':'s')+'</span></div><div class="project-numbers"><div class="project-number"><b>'+num(m.sessions)+'</b><span>sessions</span></div><div class="project-number"><b>'+num(m.messages)+'</b><span>messages</span></div><div class="project-number"><b>'+num(m.failures+m.retries)+'</b><span>friction signals</span></div></div><p class="project-themes">'+(themes.length?esc(themes.map(human).join(' · ')):findings.length+' sessions were read closely; no recurring theme cleared the evidence bar.')+'</p><button class="project-link" type="button" data-project="'+esc(name)+'">View '+findings.length+' inspected session'+(findings.length===1?'':'s')+' →</button></article>'}).join("");
-const agents=[...new Set(R.session_findings.map(x=>x.agent))],sessionRows=R.session_findings.map((x,i)=>{const name=x.title&&!x.title.startsWith(x.agent+":")?x.title:"Untitled session",search=[name,x.project,x.agent,x.task_type,...(x.themes||[])].join(" ").toLowerCase(),evidence=(x.evidence||[])[0];return '<div class="row" data-search="'+esc(search)+'" data-project="'+esc(x.project)+'" data-agent="'+esc(x.agent)+'"><div class="row-title"><b>'+esc(name)+'</b><span>'+esc(project(x.project))+'</span></div><div class="row-agent">'+esc(x.agent)+'</div><div class="row-type">'+title(x.task_type)+'</div><button type="button" class="row-open" data-open="'+i+'">Details</button><div class="row-expand"><div><h4>Outcome</h4><p>'+esc(human(x.outcome_assessment))+'</p></div><div><h4>Signals</h4><p>'+esc([...(x.strengths||[]),...(x.friction||[])].map(human).join(" · ")||"No strong signal cleared the evidence bar")+'</p></div>'+(evidence?'<div class="session-evidence">Evidence: “'+esc(excerpt(evidence.excerpt))+'”</div>':'')+'</div></div>'}).join("");const profileNames={repeated_preferences:"What you tend to prefer",working_style:"How you tend to work",recurring_corrections:"What you correct most often",strengths:"What you're good at",failure_modes:"Where things tend to go wrong"},profileHtml=Object.entries(profileNames).map(([k,label])=>{const claims=R.user_profile[k]||[],body=claims.length?claims.map(c=>'<div class="claim"><p>'+esc(human(c.claim))+'</p>'+tick("session",c.supporting_session_ids?.length||0)+'</div>').join(""):'<p class="empty">Nothing here cleared the evidence bar yet.</p>';return '<div class="profile-card"><h3>'+label+'</h3>'+body+'</div>'}).join(""),recsHtml=(R.recommendations||[]).map(r=>'<article class="rec"><div class="rec-head"><h3>'+esc(human(r.title))+'</h3><span class="tag'+(r.provisional?' provisional':'')+'">'+esc((r.provisional?'Provisional ':'')+title(r.kind))+'</span></div><p>'+esc(human(r.action))+'</p>'+(r.rule?'<div class="rule">'+esc(r.rule)+'</div>':'')+tick("session",r.supporting_session_ids?.length||0)+'</article>').join(""),limits=R.limitations?.length?'<div class="limits"><h3>Worth keeping in mind</h3><ul>'+R.limitations.map(x=>'<li>'+esc(human(x))+'</li>').join("")+'</ul></div>':"";
-$("#report").innerHTML='<div class="intro"><div class="eyebrow">Local agent intelligence</div><h1>Your work, seen across projects.</h1><p class="lede">A quieter view of your coding-agent history, grounded in <b>'+num(R.coverage.deeply_inspected)+' closely read sessions</b> and aggregate signals from '+num(R.coverage.eligible)+' substantive sessions.</p></div><section class="section" id="stats"><div class="section-head"><h2>Overview</h2><span class="count">'+R.metrics.sessions+' sessions in scope</span></div><div class="stats">'+statHtml+'</div><div class="explainer">Farpoint found <b>'+num(R.coverage.discovered)+'</b> sessions across your coding agents. It set aside <b>'+num(R.coverage.excluded_as_noise)+'</b> quick tests and one-offs, ranked the substantive work, and read <b>'+num(R.coverage.deeply_inspected)+'</b> sessions message by message. Project totals and aggregate findings use the full eligible set.</div></section><section class="section" id="usage"><div class="section-head"><h2>'+(hasEconomics?'Usage & cost':'Usage')+'</h2><span class="count">archive-wide unless noted</span></div><p class="note">'+(hasEconomics?'Spend, savings, agent share, model usage, tools, and the task mix observed in inspected sessions.':'Agent share, model usage, tools, and the task mix observed in inspected sessions.')+'</p>'+usageHtml+'</section><section class="section" id="projects"><div class="section-head"><h2>Projects</h2><span class="count">'+projectMetrics.length+' in scope</span></div><p class="note">Your work grouped by project, with volume, friction, inspected themes, and linked insights kept together.</p><div class="projects">'+(projectCards||'<p class="empty">No named projects were found.</p>')+'</div></section><section class="section" id="insights"><div class="section-head"><h2>Recommendations</h2><span class="count">'+(R.recommendations||[]).length+' actions</span></div><p class="note">Concrete changes derived from the repeated patterns below, placed first so the report leads with what to do next.</p><div class="recs">'+(recsHtml||'<p class="empty">No recommendation cleared the evidence bar.</p>')+'</div><div class="group"><div class="section-head"><h2>Supporting insights</h2><span class="count">'+R.discovered_insights.length+' findings</span></div><p class="note">Behavioral patterns come from exact session evidence. Numerical findings are computed across the archive. Expand a finding to inspect why it matters, the comparison, and its sources.</p></div><div class="group"><div class="group-label">Patterns across sessions and projects</div>'+(patterns.map(insightCard).join("")||'<p class="empty">No behavioral pattern cleared the evidence bar.</p>')+'</div><div class="group"><div class="group-label">Signals from the full archive</div>'+(numbers.map(insightCard).join("")||'<p class="empty">No aggregate anomaly cleared the usefulness bar.</p>')+'</div></section><section class="section" id="profile"><div class="section-head"><h2>Profile</h2><span class="count">patterns, not labels</span></div><p class="note">Repeated preferences and working tendencies, each bounded by the sessions that support it.</p><div class="profile">'+profileHtml+'</div>'+limits+'</section><section class="section" id="sessions"><div class="section-head"><h2>Supporting sessions</h2><span class="count">'+R.session_findings.length+' read in detail</span></div><p class="note">The source material behind the project summaries and insights. Search across title, project, agent, and theme.</p><div class="toolbar"><input class="search" id="search" placeholder="Search title, project, agent, theme…"><select class="select" id="agent-filter"><option value="">All agents</option>'+agents.map(a=>'<option>'+esc(a)+'</option>').join("")+'</select></div><div class="table">'+(sessionRows||'<p class="empty">No sessions available.</p>')+'</div></section><footer>Generated locally · source evidence stays on this machine</footer>';
-const filter=()=>{const q=$("#search").value.toLowerCase(),a=$("#agent-filter").value;$$('.row').forEach(r=>r.hidden=!(r.dataset.search.includes(q)&&(!a||r.dataset.agent===a)))};
-$("#search")?.addEventListener('input',filter);$("#agent-filter")?.addEventListener('change',filter);
-$$('[data-open]').forEach(b=>b.addEventListener('click',()=>{const r=b.closest('.row');r.classList.toggle('open');b.textContent=r.classList.contains('open')?'Close':'Details'}));
-$$('[data-project]').forEach(b=>b.addEventListener('click',()=>{$("#search").value=b.dataset.project;filter();$("#sessions").scrollIntoView()}));
-function download(name,content,type){const url=URL.createObjectURL(new Blob([content],{type})),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
-function markdownReport(){const lines=['# Farpoint usage report','','Generated '+new Date(R.generated_at).toLocaleString(),'','## Overview','','- '+R.coverage.eligible+' substantive sessions in scope','- '+R.coverage.deeply_inspected+' sessions read in detail','- '+R.discovered_insights.length+' evidence-backed insights',...(hasEconomics?['- '+money(spent)+' tracked API spend ('+(cache.claude_only?'Claude-priced sessions only':'all priced sessions')+')','- '+money(saved)+' estimated cache savings']:[]),'- '+topAgent[0]+' is the most-used agent with '+topAgent[1]+' human sessions','- '+modelUsage.length+' models recorded','','## Projects',''];projectMetrics.forEach(([name,m])=>lines.push('### '+project(name),'','- '+m.sessions+' sessions · '+m.messages+' messages · '+(m.failures+m.retries)+' friction signals',''));lines.push('## Insights','');R.discovered_insights.forEach(x=>lines.push('### '+human(x.title),'',human(x.observation),'','Why it matters: '+human(x.why_it_matters),'',...(x.evidence||[]).slice(0,3).map(e=>'> '+excerpt(e.excerpt)+' — '+e.title+' ('+project(e.project)+')'),''));lines.push('## Profile','');Object.entries(profileNames).forEach(([key,label])=>{lines.push('### '+label,'');(R.user_profile[key]||[]).forEach(c=>lines.push('- '+human(c.claim)+' ('+c.supporting_session_ids.length+' sessions)'));lines.push('')});lines.push('## Supporting sessions','');R.session_findings.forEach(x=>lines.push('- **'+x.title+'** · '+project(x.project)+' · '+title(x.task_type)+' — '+human(x.outcome_assessment)));if(R.limitations?.length)lines.push('','## Limitations','',...R.limitations.map(x=>'- '+human(x)));return lines.join('\\n')}const exportToggle=$("#export-toggle"),exportMenu=$("#export-menu");exportToggle.addEventListener('click',()=>{const open=exportMenu.hidden;exportMenu.hidden=!open;exportToggle.setAttribute('aria-expanded',String(open))});document.addEventListener('click',e=>{if(!e.target.closest('.export')){exportMenu.hidden=true;exportToggle.setAttribute('aria-expanded','false')}});$$('[data-export]').forEach(b=>b.addEventListener('click',()=>{const stamp=R.generated_at.slice(0,10);exportMenu.hidden=true;if(b.dataset.export==='pdf'){window.print();return}if(b.dataset.export==='markdown')download('farpoint-report-'+stamp+'.md',markdownReport(),'text/markdown');if(b.dataset.export==='json')download('farpoint-report-'+stamp+'.json',JSON.stringify(R,null,2),'application/json')}));
-let printState=[];window.addEventListener('beforeprint',()=>{printState=$$('details.insight').map(d=>d.open);$$('details.insight').forEach(d=>d.open=true);$$('.row').forEach(r=>r.classList.add('open'))});window.addEventListener('afterprint',()=>{$$('details.insight').forEach((d,i)=>d.open=printState[i]||false);$$('.row').forEach(r=>r.classList.remove('open'))});
-const observer=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting)$$('.nav a').forEach(a=>a.classList.toggle('active',a.getAttribute('href')==='#'+e.target.id))}),{rootMargin:'-20% 0 -70%'});$$('.section').forEach(s=>observer.observe(s));</script></body></html>`;
+  return String.raw`<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Farpoint · report</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&display=swap');
+    :root { color-scheme:dark; --ink:#f0f1ed; --muted:#a7aea7; --faint:#8e978f; --line:#2a2e2c; --accent:#84d7a0; --accent-deep:#2c4a37; --paper:#101211; --sidebar:#0b0d0c; --panel:#151816; --card:#141715; --soft:#1b1f1c; --sans:'Instrument Sans',ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; --mono:'DM Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
+    * { box-sizing:border-box; }
+    html,body { margin:0; min-height:100%; background:var(--paper); color:var(--ink); }
+    body { overflow-x:hidden; font-family:var(--sans); font-optical-sizing:auto; -webkit-font-smoothing:antialiased; }
+    button,input { color:inherit; font:inherit; }
+    button:focus-visible,input:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+    ::selection { background:var(--accent-deep); color:var(--ink); }
+    .shell { min-height:100vh; display:grid; grid-template-columns:236px minmax(0,1fr); }
+    .sidebar { position:sticky; top:0; height:100vh; display:flex; flex-direction:column; padding:28px 18px 20px; border-right:1px solid var(--line); background:var(--sidebar); }
+    .mark { display:flex; align-items:center; gap:10px; padding:0 8px; font-size:18px; font-weight:650; letter-spacing:-.045em; }
+    .mark i { color:var(--accent); font-style:normal; }
+    .logo { width:24px; height:24px; overflow:visible; }
+    .logo .frame { fill:none; stroke:#656965; stroke-width:1.5; stroke-linecap:round; }
+    .logo .point { fill:var(--accent); }
+    .logo .ray { fill:none; stroke:var(--accent); stroke-width:1.5; stroke-linecap:round; }
+    .nav { display:grid; gap:3px; margin-top:56px; }
+    .nav button { display:flex; align-items:center; gap:10px; width:100%; min-height:42px; padding:10px; border:1px solid transparent; border-radius:6px; background:transparent; color:var(--faint); cursor:pointer; text-align:left; font-size:14px; transition:background .16s ease,color .16s ease,border-color .16s ease; }
+    .nav button:hover { color:#d5d8d3; background:var(--panel); }
+    .nav button.active { color:var(--ink); border-color:var(--line); background:var(--panel); }
+    .nav-num { color:#5f665f; font:500 10px var(--mono); }
+    .nav button.active .nav-num { color:var(--accent); }
+    .sidebar-note { margin:auto 8px 18px; padding-top:16px; border-top:1px solid var(--line); color:#6f766f; font-size:11px; line-height:1.55; }
+    .sidebar-note strong { display:block; margin-bottom:4px; color:#adb2ac; font-weight:550; }
+    .sidebar-actions { display:grid; gap:6px; margin:0 8px; }
+    .sidebar-actions button { min-height:34px; border:1px solid var(--line); border-radius:5px; background:transparent; color:var(--muted); cursor:pointer; font-size:11px; }
+    .sidebar-actions button:hover { border-color:#555c56; color:var(--ink); }
+    .main { min-width:0; min-height:100vh; display:flex; flex-direction:column; }
+    .topbar { min-height:64px; display:flex; align-items:center; justify-content:space-between; gap:20px; padding:0 clamp(24px,5vw,72px); border-bottom:1px solid var(--line); }
+    .topbar-context { color:var(--muted); font-size:12px; }
+    .topbar-context b { color:var(--ink); font-weight:550; }
+    .topbar-meta { color:var(--faint); font:400 10px var(--mono); text-align:right; }
+    .stage { flex:1; min-height:0; }
+    .page { display:none; width:min(1120px,100%); min-height:calc(100vh - 134px); margin:0 auto; padding:58px clamp(24px,5vw,72px) 84px; }
+    .page.active { display:block; animation:enter .26s cubic-bezier(.2,.75,.25,1) both; }
+    .page h1 { max-width:820px; margin:0; font-size:clamp(36px,5vw,64px); line-height:1.02; letter-spacing:-.058em; font-weight:520; text-wrap:balance; }
+    .lede { max-width:680px; margin:20px 0 0; color:#a9ada8; font-size:16px; line-height:1.68; }
+    .page-intro { display:flex; align-items:end; justify-content:space-between; gap:30px; margin-bottom:34px; }
+    .page-intro p { max-width:420px; margin:0; color:var(--muted); font-size:13px; line-height:1.65; }
+    .eyebrow { display:block; margin-bottom:14px; color:var(--accent); font:500 10px var(--mono); letter-spacing:.08em; text-transform:uppercase; }
+    .scope-line { display:flex; flex-wrap:wrap; gap:8px 20px; margin-top:22px; color:var(--muted); font:400 12px var(--sans); }
+    .scope-line span::before { content:none; }
+    .scope-line span:last-child { display:none; }
+    .nav-secondary { display:grid; gap:3px; margin-top:22px; padding-top:18px; border-top:1px solid var(--line); }
+    .nav-secondary-label { padding:0 10px 7px; color:#626a63; font:500 9px var(--mono); letter-spacing:.08em; text-transform:uppercase; }
+    .nav-secondary button { display:flex; align-items:center; gap:12px; width:100%; min-height:36px; padding:8px 10px; border:1px solid transparent; border-radius:6px; background:transparent; color:#707970; cursor:pointer; text-align:left; font-size:12px; }
+    .nav-secondary button:hover,.nav-secondary button.active { color:var(--ink); background:var(--panel); border-color:var(--line); }
+    .report-path { display:none; }
+    .path-step { display:grid; grid-template-columns:42px minmax(0,1fr); gap:20px; padding:20px 0; border-bottom:1px solid var(--line); }
+    .path-number { color:var(--accent); font:500 11px var(--mono); }
+    .path-step h2 { margin:0; color:#e3e6e0; font-size:18px; line-height:1.3; font-weight:560; }
+    .path-step p { max-width:620px; margin:6px 0 0; color:var(--muted); font-size:13px; line-height:1.6; }
+    .primary-link { display:inline-flex; align-items:center; gap:8px; margin-top:28px; padding:10px 0; border:0; background:transparent; color:var(--accent); cursor:pointer; font-size:13px; font-weight:600; text-decoration:underline; text-underline-offset:4px; }
+    .profile-groups { display:grid; gap:34px; max-width:900px; }
+    .profile-group { border-top:1px solid var(--line); }
+    .profile-group h2 { margin:0; padding:15px 0 13px; color:#c9cec8; font-size:14px; font-weight:600; }
+    .profile-claims { display:grid; gap:0; background:transparent; }
+    .profile-claim { display:flex; justify-content:space-between; align-items:start; gap:22px; padding:14px 0; border-bottom:1px solid var(--line); background:transparent; }
+    .profile-claim p { max-width:700px; margin:0; color:#e0e4de; font-size:14px; line-height:1.5; }
+    .profile-claim span { flex:0 0 auto; color:var(--muted); font:400 11px var(--sans); white-space:nowrap; }
+    .overview-lead { display:grid; grid-template-columns:minmax(0,1.25fr) minmax(260px,.75fr); gap:18px; margin-top:42px; }
+    .recommendation-lead { min-height:260px; padding:27px 30px 28px; border:1px solid #3b5544; border-radius:8px; background:var(--accent-deep); }
+    .recommendation-lead .eyebrow { color:#b5f0c7; }
+    .recommendation-lead h2 { max-width:650px; margin:0; font-size:clamp(25px,3vw,38px); line-height:1.08; letter-spacing:-.04em; font-weight:560; }
+    .recommendation-lead p { max-width:650px; margin:16px 0 0; color:#cfe7d5; font-size:14px; line-height:1.65; }
+    .recommendation-lead .lead-action { margin-top:22px; color:#f0fff3; font-weight:550; }
+    .lead-link { display:inline-flex; align-items:center; gap:8px; margin-top:20px; padding:0; border:0; background:transparent; color:#effff2; cursor:pointer; font-size:13px; font-weight:600; text-decoration:underline; text-underline-offset:4px; }
+    .glance { border:1px solid var(--line); border-radius:8px; background:var(--panel); overflow:hidden; }
+    .glance h2 { margin:0; padding:18px 20px 15px; border-bottom:1px solid var(--line); color:#c8ccc7; font-size:13px; font-weight:600; }
+    .glance-grid { display:grid; grid-template-columns:1fr 1fr; }
+    .glance-stat { min-height:95px; padding:16px 18px; border-bottom:1px solid var(--line); }
+    .glance-stat:nth-child(odd) { border-right:1px solid var(--line); }
+    .glance-stat:nth-last-child(-n+2) { border-bottom:0; }
+    .glance-stat b { display:block; color:var(--ink); font:500 24px var(--mono); letter-spacing:-.04em; }
+    .glance-stat span { display:block; margin-top:7px; color:var(--muted); font-size:11px; line-height:1.35; }
+    .signal-block { margin-top:48px; }
+    .signal-block h2 { margin:0 0 13px; color:#c8ccc7; font-size:14px; font-weight:600; }
+    .signal-list { border-top:1px solid var(--line); }
+    .signal-row { display:grid; grid-template-columns:34px minmax(0,1fr) auto; gap:14px; align-items:start; padding:18px 0; border-bottom:1px solid var(--line); }
+    .signal-index { color:var(--accent); font:500 11px var(--mono); }
+    .signal-row strong { display:block; color:#e3e5e0; font-size:15px; line-height:1.35; font-weight:550; }
+    .signal-row p { max-width:700px; margin:5px 0 0; color:var(--muted); font-size:13px; line-height:1.6; }
+    .signal-row button { padding:4px 0; border:0; background:transparent; color:var(--accent); cursor:pointer; font-size:12px; white-space:nowrap; }
+    .reading-note { display:grid; grid-template-columns:150px minmax(0,650px); gap:22px; margin-top:40px; padding-top:18px; border-top:1px solid var(--line); }
+    .reading-note strong { color:var(--ink); font-size:13px; font-weight:600; }
+    .reading-note p { margin:0; color:var(--muted); font-size:13px; line-height:1.65; }
+    .recommendations { display:grid; gap:10px; max-width:960px; }
+    .recommendation { display:grid; grid-template-columns:46px minmax(0,1fr) auto; gap:20px; align-items:start; padding:22px 0 23px; border:0; border-top:1px solid var(--line); border-radius:0; background:transparent; }
+    .recommendation:hover { border-color:#465049; }
+    .recommendation-rank { color:var(--accent); font:500 12px var(--mono); }
+    .recommendation h2 { margin:0; color:#e7e9e4; font-size:18px; line-height:1.3; font-weight:560; letter-spacing:-.02em; }
+    .recommendation p { max-width:720px; margin:8px 0 0; color:var(--muted); font-size:13px; line-height:1.65; }
+    .recommendation-rule { margin-top:13px; color:#c3c8c1; font-size:12px; line-height:1.55; }
+    .recommendation-rule b { color:var(--accent); font-weight:550; }
+    .recommendation button { padding:4px 0; border:0; background:transparent; color:var(--accent); cursor:pointer; font-size:12px; white-space:nowrap; }
+    .empty { padding:18px; border:1px solid var(--line); color:var(--muted); font-size:13px; }
+    .dossier-header { margin-bottom:25px; padding-bottom:21px; border-bottom:1px solid var(--line); }
+    .dossier-header h2 { max-width:760px; margin:0; font-size:clamp(22px,3vw,32px); line-height:1.08; letter-spacing:-.035em; font-weight:560; }
+    .dossier-header p { max-width:700px; margin:10px 0 0; color:var(--muted); font-size:13px; line-height:1.6; }
+    .tabs { display:flex; flex-wrap:wrap; gap:18px; margin-bottom:18px; padding:0; border:0; background:transparent; width:max-content; max-width:100%; }
+    .tabs button { padding:7px 0 8px; border:0; border-bottom:2px solid transparent; border-radius:0; background:transparent; color:var(--muted); cursor:pointer; font-size:12px; }
+    .tabs button:hover { color:var(--ink); }
+    .tabs button.active { background:transparent; color:var(--accent); box-shadow:none; border-bottom-color:var(--accent); }
+    .dossier-grid { display:grid; gap:0; max-width:1000px; }
+    .dossier-card { border:0; border-top:1px solid var(--line); border-radius:0; background:transparent; overflow:hidden; }
+    .dossier-card:hover { border-color:var(--line); }
+    .dossier-toggle { display:grid; grid-template-columns:minmax(0,1fr) 28px; gap:18px; width:100%; padding:19px 0; text-align:left; border:0; background:transparent; color:inherit; cursor:pointer; }
+    .dossier-kicker-row { display:block; margin-bottom:7px; color:var(--faint); font:500 10px var(--mono); letter-spacing:.03em; text-transform:uppercase; }
+    .dossier-card h3 { margin:0; color:#e1e4df; font-size:16px; line-height:1.38; font-weight:540; overflow-wrap:anywhere; }
+    .dossier-meta { display:block; margin-top:9px; color:var(--muted); font:400 11px var(--sans); }
+    .dossier-icon { display:grid; place-items:center; width:24px; height:24px; color:var(--faint); border:1px solid var(--line); border-radius:50%; font:400 16px var(--mono); }
+    .dossier-card.open .dossier-icon { color:var(--accent); transform:rotate(45deg); }
+    .dossier-answer { display:grid; grid-template-rows:0fr; transition:grid-template-rows .24s ease; }
+    .dossier-answer > div { overflow:hidden; }
+    .dossier-card.open .dossier-answer { grid-template-rows:1fr; }
+    .dossier-copy { max-width:800px; padding:0 0 21px; }
+    .dossier-copy p { margin:7px 0 0; color:var(--muted); font-size:13px; line-height:1.65; }
+    .dossier-label { display:block; margin:15px 0 0; color:#d0d4ce; font-size:11px; font-weight:600; }
+    .dossier-label:first-child { margin-top:0; }
+    .text-link { margin-top:15px; padding:0; border:0; background:transparent; color:var(--accent); cursor:pointer; font-size:12px; font-weight:600; text-decoration:underline; text-underline-offset:3px; }
+    .activity-tabs { margin-bottom:24px; }
+    .activity-view { display:none; max-width:1040px; }
+    .activity-view.active { display:block; animation:enter .2s ease both; }
+    .metric-groups { display:grid; grid-template-columns:repeat(2,minmax(240px,1fr)); gap:12px; }
+    .metric-group { border:1px solid var(--line); border-radius:7px; background:var(--panel); overflow:hidden; }
+    .metric-group h2 { margin:0; padding:14px 16px; border-bottom:1px solid var(--line); color:#b9beb8; font-size:12px; font-weight:600; }
+    .metric-row { display:flex; justify-content:space-between; gap:24px; padding:10px 16px; border-bottom:1px solid #242825; font-size:12px; }
+    .metric-row:last-child { border-bottom:0; }
+    .metric-row span { min-width:0; color:var(--muted); overflow-wrap:anywhere; }
+    .metric-row b { color:#dfe3dd; font:500 11px var(--mono); text-align:right; }
+    .chart { max-width:900px; }
+    .chart-metrics { display:flex; flex-wrap:wrap; gap:2px; margin-bottom:22px; padding:3px; border:1px solid var(--line); border-radius:6px; background:var(--panel); width:max-content; max-width:100%; }
+    .chart-metrics button { padding:7px 12px; border:0; border-radius:4px; background:transparent; color:var(--muted); cursor:pointer; font-size:12px; }
+    .chart-metrics button.active { background:var(--soft); color:var(--ink); box-shadow:0 0 0 1px #39403a; }
+    .chart-rows { display:grid; gap:5px; }
+    .chart-row { display:grid; grid-template-columns:minmax(120px,190px) 1fr 72px; gap:16px; align-items:center; width:100%; padding:8px 0; border:0; background:transparent; color:var(--muted); cursor:pointer; text-align:left; }
+    .chart-row > span:first-child { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .chart-row:hover { color:var(--ink); }
+    .track { height:5px; background:#292d2a; overflow:hidden; }
+    .fill { display:block; height:100%; background:#aeb5ae; transform-origin:left; animation:grow .4s cubic-bezier(.2,.75,.25,1) both; transition:background .15s ease; }
+    .chart-row:hover .fill,.chart-row.active .fill { background:var(--accent); }
+    .chart-row b { color:var(--muted); font:400 11px var(--sans); text-align:right; }
+    .chart-detail { min-height:36px; margin-top:17px; padding-top:12px; border-top:1px solid var(--line); color:var(--muted); font-size:12px; }
+    .search-wrap { display:flex; align-items:center; gap:14px; max-width:900px; margin:8px 0 15px; }
+    .search { width:100%; min-height:44px; padding:0 14px; border:1px solid #353a36; border-radius:6px; background:var(--panel); color:var(--ink); font-size:13px; }
+    .search::placeholder { color:#687069; }
+    .result-count { flex:0 0 auto; color:var(--muted); font-size:12px; }
+    .evidence-list { display:grid; gap:1px; max-width:900px; border:1px solid var(--line); border-radius:7px; background:var(--line); overflow:hidden; }
+    .evidence-row { padding:16px 18px; border:0; background:var(--card); text-align:left; cursor:pointer; }
+    .evidence-row:hover { background:var(--soft); }
+    .evidence-row strong { display:block; margin-bottom:5px; color:#e0e3de; font-size:14px; line-height:1.35; font-weight:540; overflow-wrap:anywhere; }
+    .evidence-meta { display:block; color:var(--muted); font:400 11px var(--sans); }
+    .evidence-detail { display:none; max-width:820px; margin-top:13px; padding-top:12px; border-top:1px solid var(--line); color:#aab0a9; font-size:12px; line-height:1.7; white-space:pre-wrap; overflow-wrap:anywhere; }
+    .evidence-row.open .evidence-detail { display:block; animation:enter .18s ease both; }
+    .footer { display:flex; justify-content:flex-end; padding:16px clamp(24px,5vw,72px) 25px; border-top:1px solid var(--line); }
+    .footer p { margin:0; color:#697169; font-size:11px; }
+    @keyframes enter { from { opacity:0; transform:translateY(7px); } to { opacity:1; transform:none; } }
+    @keyframes grow { from { transform:scaleX(0); } }
+    @media (max-width:900px) { .page-intro { display:block; } .page-intro p { margin-top:12px; } .overview-lead { grid-template-columns:1fr; } .metric-groups { grid-template-columns:1fr; } }
+    @media (max-width:700px) { .shell { grid-template-columns:64px minmax(0,1fr); } .sidebar { padding:23px 7px 15px; align-items:center; } .mark { padding:0; } .mark span,.nav-text,.sidebar-note,.sidebar-actions { display:none; } .nav { width:100%; margin-top:48px; } .nav button { justify-content:center; padding:9px 4px; } .nav-num { font-size:10px; } .topbar { min-height:56px; padding:0 18px; } .topbar-context { font-size:11px; } .topbar-meta { display:none; } .page { min-height:calc(100vh - 112px); padding:36px 18px 64px; } .page h1 { font-size:38px; } .lede { font-size:15px; } .recommendation-lead { padding:22px 20px 23px; } .recommendation-lead h2 { font-size:28px; } .signal-row { grid-template-columns:26px minmax(0,1fr); gap:10px; } .signal-row button { grid-column:2; justify-self:start; } .reading-note { grid-template-columns:1fr; gap:7px; } .recommendation { grid-template-columns:30px minmax(0,1fr); gap:12px; padding:18px; } .recommendation button { grid-column:2; justify-self:start; } .dossier-toggle { padding:17px 15px; } .dossier-copy { padding:0 15px 18px; } .chart-row { grid-template-columns:100px 1fr 54px; gap:9px; } }
+    @media (max-width:700px) { .path-step { grid-template-columns:28px minmax(0,1fr); gap:12px; } .profile-claim { display:block; } .profile-claim span { display:block; margin-top:8px; } }
+    .eyebrow { display:none; }
+    .page h1 { max-width:760px; font-size:clamp(34px,4.6vw,56px); line-height:1.06; letter-spacing:-.045em; }
+    .lede { max-width:620px; margin-top:18px; font-size:17px; line-height:1.65; }
+    .primary-link { margin-top:30px; padding:11px 15px; border:1px solid var(--accent); border-radius:7px; background:var(--accent); color:#102016; text-decoration:none; }
+    .recommendation { grid-template-columns:minmax(0,1fr) auto auto; gap:24px; }
+    .recommendation > div { min-width:0; }
+    .dossier-card:last-child { border-bottom:1px solid var(--line); }
+    .dossier-card.dossier-collapsed { display:none; }
+    .dossier-more { display:block; margin-top:22px; padding:0; border:0; background:transparent; color:var(--accent); cursor:pointer; font:600 13px var(--sans); }
+    .dossier-more:hover { color:var(--ink); }
+    .topbar-context { display:none; }
+    .topbar { display:none; }
+    .page { min-height:calc(100vh - 70px); }
+    .page-intro > p { display:none; }
+    .nav-secondary { margin-top:42px; padding-top:0; border-top:0; gap:2px; }
+    .nav-secondary-label { display:none; }
+    .nav-secondary button { min-height:32px; padding:7px 10px; border:0; border-radius:4px; color:#8c958d; font-size:13px; }
+    .nav-secondary .nav-num { display:none; }
+    .nav-secondary button:first-of-type { color:var(--ink); background:transparent; }
+    .nav-secondary button:last-of-type { color:var(--faint); }
+    .nav-secondary button:hover,.nav-secondary button.active { color:var(--ink); background:var(--panel); border-color:transparent; }
+    .nav-icon { width:16px; height:16px; flex:0 0 16px; color:var(--faint); }
+    .nav-icon circle,.nav-icon path,.nav-icon rect,.nav-icon polyline { fill:none; stroke:currentColor; stroke-width:1.4; stroke-linecap:round; stroke-linejoin:round; }
+    .nav button.active .nav-icon,.nav button:hover .nav-icon,.nav-secondary .nav-icon { color:var(--accent); }
+    .sidebar-actions { display:flex; gap:14px; margin:18px 10px 0; padding-top:14px; border-top:1px solid var(--line); }
+    .sidebar-actions button { display:inline-flex; align-items:center; gap:10px; min-height:24px; padding:0; border:0; border-radius:0; font-size:12px; text-align:left; }
+    .sidebar-actions button:hover { border-color:transparent; }
+    .action-icon { width:14px; height:14px; flex:0 0 14px; color:var(--accent); }
+    .action-icon path,.action-icon rect { fill:none; stroke:currentColor; stroke-width:1.4; stroke-linecap:round; stroke-linejoin:round; }
+    @media (max-width:700px) { .sidebar-actions { display:none; } }
+    .recommendation .recommendation-evidence { margin-top:0; }
+    @media (max-width:700px) { .recommendation { grid-template-columns:1fr; } .recommendation button { grid-column:1; justify-self:start; } }
+    @media print { .sidebar,.topbar,.footer { display:none; } .main { display:block; } .stage { display:block; } .page,.page.active { display:block; width:auto; min-height:0; padding:28px 20px; break-inside:avoid; } body,.page,.profile-claim,.dossier-card,.metric-group,.evidence-row { background:white!important; color:#111!important; } .page h1,.page h2,.page h3,.profile-claim p,.dossier-card h3,.metric-row b,.evidence-row strong { color:#111!important; } .page p,.profile-claim span,.dossier-meta,.metric-row span,.evidence-meta { color:#555!important; } }
+    @media (prefers-reduced-motion:reduce) { *,*::before,*::after { animation:none!important; transition:none!important; } }
+  </style>
+</head>
+<body>
+  <!-- THESIS: Make the report a guided profile, not a dashboard. OWN-WORLD: A dark evidence ledger with mint signal, hairline structure, and measurement in mono. STORY: You understand how you work, then why Farpoint thinks so, then what to try. FIRST VIEWPORT: A quiet introduction names the three layers of the report and keeps all conclusions for later pages. FORM: Profile reading, ordered Intro, Your profile, Findings + insights, Recommendations; activity and source evidence are optional detail; seed key evidence-ledger-report-v3. FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md -->
+  <main id="report"></main>
+  <script id="report-data" type="application/json">${serialize(report)}</script>
+  <script>
+    const R=JSON.parse(document.getElementById('report-data').textContent);
+    const esc=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+    const clean=value=>String(value??'').replace(/\s*\[[\w.-]+:[\w-]+:[\d,\-]+\]/g,'').replace(/\[\d+:\s*([^\]]*)\]/g,'$1').replace(/\s+Support:.*$/i,'').replace(/\bthe user's\b/gi,'your').replace(/\bthe user’s\b/gi,'your').replace(/\bthe user\b/gi,'you').replace(/\busers'\b/g,'your').replace(/\buser's\b/gi,'your').replace(/\bUsers\b/g,'You').replace(/\busers\b/g,'you').replace(/\buser\b/gi,'you').replace(/:\s+they\b/gi,': you').replace(/\s{2,}/g,' ').trim();
+    const short=(value,max=260)=>{const text=clean(value);if(text.length<=max)return text;const cut=text.slice(0,max);return cut.slice(0,Math.max(cut.lastIndexOf('.'),cut.lastIndexOf(' ')))+'…'};
+    const project=value=>String(value||'Coding session').split(/[\\/]/).filter(Boolean).pop()?.replace(/[_-]+/g,' ')||'Coding session';
+    const label=value=>String(value||'').replace(/_/g,' ').replace(/\b\w/g,char=>char.toUpperCase());
+    const number=value=>Number(value||0).toLocaleString(undefined,{maximumFractionDigits:2});
+    const compact=value=>Intl.NumberFormat(undefined,{notation:'compact',maximumFractionDigits:1}).format(Number(value||0));
+    const percent=value=>(Number(value||0)*100).toLocaleString(undefined,{maximumFractionDigits:1})+'%';
+    const money=value=>Number(value||0).toLocaleString(undefined,{style:'currency',currency:'USD',maximumFractionDigits:2});
+    const insights=[...(R.discovered_insights||[])].sort((a,b)=>(b.score||b.support_count||0)-(a.score||a.support_count||0));
+    const findings=R.session_findings||[];
+    const recommendations=R.recommendations||[];
+    const primary=insights[0]||{title:'Your work has a shape worth seeing.',observation:'Farpoint found patterns across your recent agent sessions.',action:'Choose one small practice to try next.'};
+    const next=recommendations[0]||{title:'Start with one small change',action:primary.action};
+    const recommendationHeadlines={'storyboard-first visual teaching skill':'Storyboard visual work before you build it.','artifact-specific acceptance gate':'Verify the result, not just the process.','environment preflight skill':'Check the environment before you start.','scope acceptance matrix':'Decide what is in and out before coding.','add a simplicity gate before visual implementation':'Plan the simple version before you build it.','validate integrations before implementation':'Check tools and access before you rely on them.','confirm optional features before setup':'Ask before adding extra features.'};
+    const recommendationHeadline=recommendationHeadlines[clean(next.title).toLowerCase()]||clean(next.title)||'Start with one small change';
+    const isRawSessionTitle=value=>{const text=clean(value);return !text||/^(?:[a-z0-9._-]+:)?(?:ses_[a-z0-9]+|[a-f0-9]{8,}(?:-[a-f0-9]+){1,})$/i.test(text)};
+    const sessionTitle=(value,projectName='')=>{const text=clean(value);if(!isRawSessionTitle(text))return text;const place=project(projectName);return place==='Coding session'?'Session evidence':'Session in '+place};
+    const profileGroups=R.user_profile||{};
+    const profileQuestions={repeated_preferences:'What do you ask for most?',working_style:'How do you like to work?',recurring_corrections:'When do you change course?',strengths:'What are you unusually good at?',failure_modes:'Where does work go sideways?'};
+    const profileEntries=Object.entries(profileQuestions).map(([key,question])=>{const claims=(profileGroups[key]||[]).map(item=>clean(item.claim)).filter(Boolean);return{kind:'Profile',question,title:claims[0]||'Still taking shape',sections:[['Also observed',claims.slice(1).join(' ')],['Support',claims.length+' recurring signal'+(claims.length===1?'':'s')]],evidence:[],query:'',score:claims.length>1?1:.5}});
+    const sessionById=new Map(findings.filter(item=>item.session_id).map(item=>[item.session_id,item]));
+    const evidenceSearchQuery=item=>{const first=item.evidence?.[0],finding=sessionById.get(first?.session_id);return sessionTitle(first?.title||finding?.title||first?.project||item.title,first?.project||finding?.project)};
+    const questionItems=[...insights.map(item=>({kind:'Insight',question:clean(item.title),title:clean(item.observation),sections:[['Why it matters',item.why_it_matters],['Try this',item.action],['Expected impact',item.expected_impact],['Another explanation',item.competing_explanation],['Metric evidence',(item.metric_evidence||[]).join(' · ')]],evidence:item.evidence||[],query:evidenceSearchQuery(item),score:item.confidence_score||0})),...findings.map(item=>({kind:'Session finding',question:sessionTitle(item.title,item.project),title:sessionTitle(item.title,item.project),sections:[['Outcome',item.outcome_assessment],['Friction',(item.friction||[]).join(' ')],['What worked',(item.strengths||[]).join(' ')],['Recurring mistakes',(item.recurring_mistakes||[]).join(' ')],['Preferences',(item.user_preferences||[]).join(' ')],['Advice',(item.advice||[]).join(' ')]],evidence:item.evidence||[],query:evidenceSearchQuery(item),score:item.confidence_score||0}))];
+    const dossierCards=[...questionItems];
+    const profileGroupsHtml=Object.entries(profileQuestions).map(([key,question])=>{const claims=(profileGroups[key]||[]).filter(item=>clean(item.claim));return '<section class="profile-group"><h2>'+esc(question)+'</h2><div class="profile-claims">'+(claims.length?claims.map(item=>'<div class="profile-claim"><p>'+esc(clean(item.claim))+'</p><span>'+esc(number(item.supporting_session_ids?.length))+' session'+(item.supporting_session_ids?.length===1?'':'s')+'</span></div>').join(''):'<div class="profile-claim"><p>Still taking shape.</p><span>not enough signal</span></div>')+'</div></section>'}).join('');
+    const evidenceMap=new Map();
+    const addEvidence=item=>{if(!item)return;const key=[item.session_id,item.ordinal_start,item.ordinal_end,item.excerpt].join('|');if(!evidenceMap.has(key))evidenceMap.set(key,item)};
+    (R.evidence||[]).forEach(addEvidence);insights.forEach(item=>(item.evidence||[]).forEach(addEvidence));findings.forEach(item=>(item.evidence||[]).forEach(addEvidence));
+    const evidenceRecords=[...evidenceMap.values()];
+    const evidenceTitle=item=>{const finding=sessionById.get(item.session_id);return sessionTitle(item.title||finding?.title,item.project||finding?.project)};
+    const evidenceProject=item=>project(item.project||sessionById.get(item.session_id)?.project);
+    const evidenceAgent=item=>item.agent||sessionById.get(item.session_id)?.agent||'';
+    const evidenceOrdinal=item=>item.ordinal_start==null?'':item.ordinal_end!=null&&item.ordinal_end!==item.ordinal_start?'turns '+item.ordinal_start+'–'+item.ordinal_end:'turn '+item.ordinal_start;
+    const projectMap=new Map();
+    for(const [name,values] of Object.entries(R.metrics?.by_project||{})){const display=project(name),key=display.toLowerCase(),current=projectMap.get(key)||{name:display,sessions:0,messages:0,failures:0,retries:0,friction:0};current.sessions+=Number(values.sessions||0);current.messages+=Number(values.messages||0);current.failures+=Number(values.failures||0);current.retries+=Number(values.retries||0);current.friction=current.failures+current.retries;projectMap.set(key,current)}
+    const projectStats=[...projectMap.values()];
+    const agentStats=Object.entries(R.metrics?.by_agent||{}).map(([name,values])=>({name,...values,friction:Number(values.failures||0)+Number(values.retries||0)}));
+    const stats=R.agentsview_stats||{};
+    const modelStats=Object.entries(stats.model_mix?.by_tokens||{}).map(([name,value])=>({name,tokens:Number(value||0)}));
+    const toolStats=Object.entries(stats.tool_mix?.by_category||{}).map(([name,value])=>({name,calls:Number(value||0)}));
+    const economics=stats.cache_economics||{};
+    const hasEconomics=Number(economics.dollars_spent||0)>0||Number(economics.dollars_saved_vs_uncached||0)>0||Number(economics.cache_hit_ratio?.overall||0)>0;
+    const steps=[['intro','Intro'],['profile','Your profile'],['findings','Findings'],['recommendations','Recommendations']];
+    const secondarySteps=[['evidence','Search evidence']];
+    const caseWindow=stats.window||{};
+    const fmtDate=value=>{const date=new Date(value);return Number.isNaN(date.getTime())?'':date.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'})};
+    const identityName=clean((profileGroups.working_style||profileGroups.repeated_preferences||[])[0]?.claim)?'Your working pattern':'Your agent workflow';
+    const logo='<div class="mark"><svg class="logo" viewBox="0 0 25 25" role="img" aria-label="Farpoint"><path class="frame" d="M8 3.5H3.5V8M17 3.5h4.5V8M21.5 17v4.5H17M8 21.5H3.5V17"/><circle class="point" cx="12.5" cy="12.5" r="2.7"/><path class="ray" d="M12.5 6.5v2M18.5 12.5h-2"/></svg><span>farpoint<i>.</i></span></div>';
+    const dossierHeader='';
+    const dossierKinds=[['insight','Insights'],['session','Session findings'],['all','All']];
+    const kindSlug=kind=>kind==='Insight'?'insight':'session';
+    const dossierTabs='<nav class="tabs dossier-tabs" aria-label="Finding type">'+dossierKinds.map((tab,index)=>'<button type="button" data-dossier-kind="'+tab[0]+'" class="'+(index===0?'active':'')+'" aria-pressed="'+(index===0?'true':'false')+'">'+tab[1]+'</button>').join('')+'</nav>';
+    const dossierGrid='<div class="dossier-grid" id="dossier-grid">'+dossierCards.map((item,index)=>'<article class="dossier-card" data-kind="'+kindSlug(item.kind)+'"><button type="button" class="dossier-toggle" data-dossier="'+index+'" aria-expanded="false"><span><span class="dossier-kicker-row">'+esc(item.kind)+' · '+esc(item.question)+'</span><h3>'+esc(short(item.title,150))+'</h3></span><span class="dossier-icon" aria-hidden="true">+</span></button><div class="dossier-answer"><div><div class="dossier-copy">'+item.sections.filter(section=>clean(section[1])).map(section=>'<span class="dossier-label">'+esc(section[0])+'</span><p>'+esc(clean(section[1]))+'</p>').join('')+(item.evidence.length?'<button class="text-link" type="button" data-evidence-query="'+esc(item.query)+'">Search supporting evidence →</button>':'')+'</div></div></div></article>').join('')+'</div>';
+    const overlapCount=(a,b)=>(a||[]).filter(id=>(b||[]).includes(id)).length;
+    const groundingInsight=[...insights].sort((a,b)=>overlapCount(b.supporting_session_ids,next.supporting_session_ids)-overlapCount(a.supporting_session_ids,next.supporting_session_ids))[0]||primary;
+    const groundingIndex=insights.includes(groundingInsight)?insights.indexOf(groundingInsight):0;
+    const recommendationFindingIndex=item=>{const match=insights.findIndex(insight=>overlapCount(insight.supporting_session_ids,item.supporting_session_ids)>0);return match<0?0:match};
+    const evidenceRows=evidenceRecords.map((item,index)=>'<button class="evidence-row" type="button" data-evidence="'+index+'" aria-expanded="false"><strong>'+esc(evidenceTitle(item))+'</strong><span class="evidence-meta">'+esc([evidenceProject(item),evidenceAgent(item),label(item.signal_type),evidenceOrdinal(item)].filter(Boolean).join(' · '))+'</span><span class="evidence-detail">'+esc(item.excerpt||'No excerpt available.')+'</span></button>').join('');
+    const evidence=evidenceRows?'<div class="evidence-list" id="evidence-list">'+evidenceRows+'<div class="empty" id="evidence-empty" hidden>No evidence matches your search.</div></div>':'<div class="evidence-list" id="evidence-list"><div class="empty">No evidence excerpts are available.</div></div>';
+    const metricRows=(record,formatter=number)=>Object.entries(record||{}).map(([key,value])=>'<div class="metric-row"><span>'+esc(label(key))+'</span><b>'+esc(formatter(value))+'</b></div>').join('')||'<div class="metric-row"><span>No data available</span></div>';
+    const formatAdoption=value=>typeof value==='boolean'?(value?'Yes':'No'):Number(value)>=0&&Number(value)<=1?percent(value):number(value);
+    const percentileRows=Object.entries(R.metrics?.percentiles||{}).flatMap(([metric,values])=>Object.entries(values).map(([point,value])=>[label(metric)+' · '+point,value]));
+    const summary='<div class="metric-groups"><section class="metric-group"><h2>Totals</h2>'+metricRows({sessions:R.metrics?.sessions,...R.metrics?.totals})+'</section><section class="metric-group"><h2>Per session</h2>'+metricRows(R.metrics?.averages)+'</section><section class="metric-group"><h2>Percentiles</h2>'+percentileRows.map(([key,value])=>'<div class="metric-row"><span>'+esc(key)+'</span><b>'+esc(number(value))+'</b></div>').join('')+'</section><section class="metric-group"><h2>Outcomes</h2>'+metricRows(R.metrics?.outcomes)+'</section><section class="metric-group"><h2>Archive</h2>'+metricRows(stats.totals)+'</section><section class="metric-group"><h2>Session shapes</h2>'+metricRows(stats.archetypes)+'</section></div>';
+    const timing='<div class="metric-groups"><section class="metric-group"><h2>Turn cycle · seconds</h2>'+metricRows(stats.velocity?.turn_cycle_seconds)+'</section><section class="metric-group"><h2>First response · seconds</h2>'+metricRows(stats.velocity?.first_response_seconds)+'</section><section class="metric-group"><h2>Adoption</h2>'+metricRows(stats.adoption,formatAdoption)+'</section><section class="metric-group"><h2>Distributions</h2>'+Object.entries(stats.distributions||{}).flatMap(([name,scopes])=>Object.entries(scopes||{}).flatMap(([scope,values])=>Object.entries(values||{}).map(([point,value])=>'<div class="metric-row"><span>'+esc(label(name)+' · '+label(scope)+' · '+point)+'</span><b>'+esc(number(value))+'</b></div>'))).join('')+'</section></div>';
+    const costs='<div class="metric-groups"><section class="metric-group"><h2>LLM economics</h2><div class="metric-row"><span>Estimated spend</span><b>'+money(economics.dollars_spent)+'</b></div><div class="metric-row"><span>Saved by cache</span><b>'+money(economics.dollars_saved_vs_uncached)+'</b></div><div class="metric-row"><span>Cache hit ratio</span><b>'+percent(economics.cache_hit_ratio?.overall)+'</b></div></section></div>';
+    const activityTabs=[['summary','Summary'],['projects','Projects'],['agents','Agents'],['models','Models'],['tools','Tools'],['timing','Timing'],...(hasEconomics?[['costs','Costs']]:[])];
+    const recRows=recommendations.map((item,index)=>'<article class="recommendation"><span class="recommendation-rank">'+String(index+1).padStart(2,'0')+'</span><div><h2>'+esc(recommendationHeadlines[clean(item.title).toLowerCase()]||clean(item.title)||'One thing to try next')+'</h2><p>'+esc(short(item.action||item.description,330))+'</p>'+(item.rule?'<div class="recommendation-rule"><b>Working rule</b> · '+esc(clean(item.rule))+'</div>':'')+'</div><button type="button" data-recommendation-index="'+recommendationFindingIndex(item)+'">Open related finding →</button></article>').join('');
+    const reportIntro='This report turns your local coding-agent history into a short list of changes worth trying, then shows the patterns and original excerpts that support them.';
+    /* Legacy render path disabled during cleanup.
+    document.getElementById('report').innerHTML='<div class="shell"><aside class="sidebar">'+logo+'<nav class="nav" aria-label="Report sections">'+steps.map((step,index)=>'<button type="button" data-page="'+step[0]+'" class="'+(index===0?'active':'')+'" aria-current="'+(index===0?'page':'false')+'"><span class="nav-num">'+String(index+1).padStart(2,'0')+'</span><span class="nav-text">'+step[1]+'</span></button>').join('')+'</nav><div class="sidebar-note"><strong>Local report</strong>Source excerpts stay on this machine.</div><div class="sidebar-actions"><button type="button" id="print-report">Print / PDF</button><button type="button" id="download-json">Download JSON</button></div></aside><section class="main"><header class="topbar"><div class="topbar-context"><b>Farpoint report</b> · evidence ledger</div><div class="topbar-meta">'+esc(fmtDate(R.generated_at)||'Local analysis')+'</div></header><div class="stage"><article class="page active" id="overview"><span class="eyebrow">A decision record for your agent workflow</span><h1>See the pattern. Change the practice.</h1><p class="lede">'+esc(reportIntro)+'</p><div class="scope-line"><span>'+esc(number(R.metrics?.sessions))+' sessions in scope</span><span>'+esc(number(R.coverage?.deeply_inspected))+' read closely</span><span>generated locally</span></div><div class="overview-lead"><section class="recommendation-lead"><span class="eyebrow">Start here · recommendation 01</span><h2>'+esc(recommendationHeadline)+'</h2><p>'+esc(short(groundingInsight.observation||groundingInsight.title,260))+'</p><p class="lead-action">'+esc(short(next.action,330))+'</p><button class="lead-link" type="button" id="open-recommendation">See why this is recommended →</button></section><section class="glance"><h2>At a glance</h2><div class="glance-grid">'+glance.map(item=>'<div class="glance-stat"><b>'+esc(number(item[2]))+'</b><span>'+esc(item[1])+'</span></div>').join('')+'</div></section></div><section class="signal-block"><h2>Signals worth knowing</h2><div class="signal-list">'+(signalRows||'<div class="empty">No cross-session insights cleared the evidence bar.</div>')+'</div></section><div class="reading-note"><strong>How to read this</strong><p>Recommendations are the short list. Findings explain the patterns. Activity gives you the archive context. Evidence lets you inspect the source material yourself.</p></div></article><article class="page" id="recommendations"><div class="page-intro"><div><span class="eyebrow">What to try next</span><h1>Make one change with a reason.</h1></div><p>These actions are ordered by the patterns Farpoint found, not by generic productivity advice. Start with the first one, then measure whether it helps.</p></div><div class="recommendations">'+(recRows||'<div class="empty">No recommendation cleared the evidence bar.</div>')+'</div></article><article class="page" id="findings"><div class="page-intro"><div><span class="eyebrow">What supports the advice</span><h1>Patterns behind the recommendation.</h1></div><p>Open a finding to see why it matters, what to try, and the alternative explanation Farpoint kept in view.</p></div>'+dossierHeader+dossierTabs+dossierGrid+'</article><article class="page" id="activity"><div class="page-intro"><div><span class="eyebrow">The archive, measured</span><h1>Your activity in context.</h1></div><p>Use these views to understand volume, distribution, timing, and cost without confusing raw activity for a conclusion.</p></div><nav class="tabs activity-tabs" aria-label="Activity view">'+activityTabs.map((tab,index)=>'<button type="button" data-activity="'+tab[0]+'" class="'+(index===0?'active':'')+'" aria-pressed="'+(index===0?'true':'false')+'">'+tab[1]+'</button>').join('')+'</nav><section class="activity-view active" data-view="summary">'+summary+'</section><section class="activity-view" data-view="projects"><div class="chart" id="projects-chart"></div></section><section class="activity-view" data-view="agents"><div class="chart" id="agents-chart"></div></section><section class="activity-view" data-view="models"><div class="chart" id="models-chart"></div></section><section class="activity-view" data-view="tools"><div class="chart" id="tools-chart"></div></section><section class="activity-view" data-view="timing">'+timing+'</section>'+(hasEconomics?'<section class="activity-view" data-view="costs">'+costs+'</section>':'')+'</article><article class="page" id="evidence"><div class="page-intro"><div><span class="eyebrow">Inspect the source</span><h1>Evidence you can open.</h1></div><p>Search the original excerpts used across the synthesized insights and close-read sessions.</p></div><div class="search-wrap"><input class="search" id="evidence-search" type="search" aria-label="Search evidence, sessions, or projects" placeholder="Search evidence, sessions, projects…" autocomplete="off"><span class="result-count" id="result-count" aria-live="polite"></span></div>'+evidence+'</article></div><footer class="footer"><p>Generated locally · source evidence stays on this machine</p></footer></section></div></div>';
+    */
+    const pageMarkup='<div class="shell"><aside class="sidebar">'+logo+'<nav class="nav" aria-label="Report sections">'+steps.map((step,index)=>'<button type="button" data-page="'+step[0]+'" class="'+(index===0?'active':'')+'" aria-current="'+(index===0?'page':'false')+'"><span class="nav-num">'+String(index+1).padStart(2,'0')+'</span><span class="nav-text">'+step[1]+'</span></button>').join('')+'</nav><nav class="nav-secondary" aria-label="Optional report detail"><span class="nav-secondary-label">Inspect</span>'+secondarySteps.map(step=>'<button type="button" data-page="'+step[0]+'"><span class="nav-num">·</span><span class="nav-text">'+step[1]+'</span></button>').join('')+'</nav><div class="sidebar-actions"><button type="button" id="print-report">Print / PDF</button><button type="button" id="download-json">Download JSON</button></div></aside><section class="main"><header class="topbar"><div class="topbar-context"><b>Farpoint report</b> · local profile</div><div class="topbar-meta">'+esc(fmtDate(R.generated_at)||'Local analysis')+'</div></header><div class="stage"><article class="page active" id="intro"><span class="eyebrow">A guided read of your agent history</span><h1>What Farpoint will give you.</h1><p class="lede">Farpoint reads your coding-agent sessions and turns them into a profile of how you work, the patterns behind it, and a few changes worth trying.</p><div class="scope-line"><span>'+esc(number(R.metrics?.sessions))+' sessions in scope</span><span>'+esc(number(R.coverage?.deeply_inspected))+' read closely</span><span>generated locally</span></div><div class="report-path"><section class="path-step"><span class="path-number">01</span><div><h2>Your profile</h2><p>A grouped portrait of your preferences, working style, strengths, and recurring corrections.</p></div></section><section class="path-step"><span class="path-number">02</span><div><h2>Findings + insights</h2><p>The repeated patterns Farpoint observed, with an explanation of why each one matters.</p></div></section><section class="path-step"><span class="path-number">03</span><div><h2>Recommendations</h2><p>Specific changes to try after you understand the pattern—not generic productivity advice.</p></div></section></div><button class="primary-link" type="button" id="start-profile">Start with your profile →</button></article><article class="page" id="profile"><div class="page-intro"><div><span class="eyebrow">How you work with agents</span><h1>Your profile.</h1></div><p>These sections summarize recurring signals in your sessions. They are a portrait of your working patterns, not a personality label.</p></div><div class="profile-groups">'+profileGroupsHtml+'</div></article><article class="page" id="findings"><div class="page-intro"><div><span class="eyebrow">What the profile is based on</span><h1>Findings + insights.</h1></div><p>Read the observed pattern first, then open it for the interpretation. Supporting excerpts stay one click away.</p></div>'+dossierHeader+dossierTabs+dossierGrid+'</article><article class="page" id="recommendations"><div class="page-intro"><div><span class="eyebrow">What to try next</span><h1>Recommendations.</h1></div><p>These actions come after the profile and findings. Start with the first one and use the linked finding to understand its basis.</p></div><div class="recommendations">'+(recRows||'<div class="empty">No recommendation cleared the evidence bar.</div>')+'</div></article><article class="page" id="activity"><div class="page-intro"><div><span class="eyebrow">Optional detail</span><h1>Activity.</h1></div><p>Raw volume, distributions, timing, and economics for when you want to inspect the archive behind the interpretation.</p></div><nav class="tabs activity-tabs" aria-label="Activity view">'+activityTabs.map((tab,index)=>'<button type="button" data-activity="'+tab[0]+'" class="'+(index===0?'active':'')+'" aria-pressed="'+(index===0?'true':'false')+'">'+tab[1]+'</button>').join('')+'</nav><section class="activity-view active" data-view="summary">'+summary+'</section><section class="activity-view" data-view="projects"><div class="chart" id="projects-chart"></div></section><section class="activity-view" data-view="agents"><div class="chart" id="agents-chart"></div></section><section class="activity-view" data-view="models"><div class="chart" id="models-chart"></div></section><section class="activity-view" data-view="tools"><div class="chart" id="tools-chart"></div></section><section class="activity-view" data-view="timing">'+timing+'</section>'+(hasEconomics?'<section class="activity-view" data-view="costs">'+costs+'</section>':'')+'</article><article class="page" id="evidence"><div class="page-intro"><div><span class="eyebrow">Optional detail</span><h1>Source evidence.</h1></div><p>Search the original excerpts used across the findings and close-read sessions.</p></div><div class="search-wrap"><input class="search" id="evidence-search" type="search" aria-label="Search evidence, sessions, or projects" placeholder="Search evidence, sessions, projects…" autocomplete="off"><span class="result-count" id="result-count" aria-live="polite"></span></div>'+evidence+'</article></div><footer class="footer"><p>Generated locally · source evidence stays on this machine</p></footer></section></div>';
+    document.getElementById('report').innerHTML=pageMarkup;
+    document.getElementById('download-json')?.remove();
+    document.querySelectorAll('.nav-num,.recommendation-rank,.signal-index,.footer').forEach(element=>element.remove());
+    document.querySelectorAll('.dossier-kicker-row').forEach(element=>element.remove());
+    const navIconPaths={intro:'<circle cx="8" cy="8" r="5.2"></circle><path d="M8 4.8v3.5l2.3 1.4"></path>',profile:'<circle cx="8" cy="5.2" r="2.3"></circle><path d="M3.5 13c.8-2.1 2.3-3.1 4.5-3.1s3.7 1 4.5 3.1"></path>',findings:'<rect x="3" y="3" width="10" height="10" rx="1.5"></rect><path d="M5.5 6h5M5.5 8.5h5M5.5 11h3"></path>',recommendations:'<path d="M3 8h8.5M8.5 4.5 12 8l-3.5 3.5"></path>'};document.querySelectorAll('.nav > [data-page]').forEach(button=>{const icon=document.createElementNS('http://www.w3.org/2000/svg','svg');icon.setAttribute('viewBox','0 0 16 16');icon.setAttribute('class','nav-icon');icon.setAttribute('aria-hidden','true');icon.innerHTML=navIconPaths[button.dataset.page]||'';button.prepend(icon)});
+    const evidenceNav=document.querySelector('.nav-secondary [data-page="evidence"]');if(evidenceNav){const icon=document.createElementNS('http://www.w3.org/2000/svg','svg');icon.setAttribute('viewBox','0 0 16 16');icon.setAttribute('class','nav-icon');icon.setAttribute('aria-hidden','true');icon.innerHTML='<circle cx="6.8" cy="6.8" r="4.1"></circle><path d="m10 10 3.1 3.1"></path>';evidenceNav.prepend(icon)}
+    const printButton=document.getElementById('print-report');if(printButton){const icon=document.createElementNS('http://www.w3.org/2000/svg','svg');icon.setAttribute('viewBox','0 0 16 16');icon.setAttribute('class','action-icon');icon.setAttribute('aria-hidden','true');icon.innerHTML='<path d="M4.5 6V2.8h7V6"></path><path d="M4 11H2.8V6.4h10.4V11H12"></path><rect x="4.5" y="9" width="7" height="4.2"></rect>';printButton.prepend(icon)}
+    document.querySelectorAll('.tabs').forEach(tablist=>tablist.setAttribute('role','tablist'));
+    document.querySelectorAll('[data-activity]').forEach(button=>{const key=button.dataset.activity;button.id='activity-tab-'+key;button.setAttribute('role','tab');button.setAttribute('aria-controls','activity-panel-'+key);button.setAttribute('aria-selected',String(button.classList.contains('active')))})
+    document.querySelectorAll('[data-view]').forEach(view=>{const key=view.dataset.view;view.id='activity-panel-'+key;view.setAttribute('role','tabpanel');view.setAttribute('aria-labelledby','activity-tab-'+key);view.setAttribute('aria-hidden',String(!view.classList.contains('active')))})
+    let stepIndex=0;
+    function showPage(name,{updateHistory=true}={}){const page=document.getElementById(name);if(!page)return;stepIndex=Math.max(0,steps.findIndex(step=>step[0]===name));document.querySelectorAll('.page').forEach(item=>item.classList.toggle('active',item===page));document.querySelectorAll('[data-page]').forEach(button=>{const active=button.dataset.page===name;button.classList.toggle('active',active);button.setAttribute('aria-current',active?'page':'false')});if(updateHistory&&location.hash!=='#'+name)history.pushState({page:name},'', '#'+name);window.scrollTo?.({top:0,behavior:'smooth'});const heading=page.querySelector('h1');if(heading){heading.tabIndex=-1;heading.focus({preventScroll:true})}if(name==='evidence')document.getElementById('evidence-search')?.focus({preventScroll:true})}
+    function openFinding(index){showPage('findings');const tab=[...document.querySelectorAll('[data-dossier-kind]')].find(item=>item.dataset.dossierKind==='insight');if(tab)tab.click();const button=document.querySelector('[data-dossier="'+index+'"]');if(button){button.click();button.closest('.dossier-card')?.scrollIntoView?.({behavior:'smooth',block:'center'})}}
+    document.querySelectorAll('[data-page]').forEach(button=>button.addEventListener('click',()=>showPage(button.dataset.page)));
+    const initialPage=steps.some(step=>step[0]===location.hash.slice(1))||secondarySteps.some(step=>step[0]===location.hash.slice(1))?location.hash.slice(1):'intro';
+    showPage(initialPage,{updateHistory:false});
+    window.addEventListener('popstate',()=>showPage(location.hash.slice(1)||'intro',{updateHistory:false}));
+    document.getElementById('start-profile').addEventListener('click',()=>showPage('profile'));
+    document.querySelectorAll('[data-recommendation-index]').forEach(button=>{const index=Number(button.dataset.recommendationIndex),insight=insights[index]||insights[0];button.textContent='Open related finding →';if(insight){const evidenceButton=document.createElement('button');evidenceButton.type='button';evidenceButton.className='text-link recommendation-evidence';evidenceButton.dataset.evidenceQuery=evidenceSearchQuery(insight);evidenceButton.textContent='Inspect excerpts →';button.insertAdjacentElement('afterend',evidenceButton)}button.addEventListener('click',()=>openFinding(index))});
+    document.querySelectorAll('[data-dossier]').forEach((button,index)=>{const panel=button.closest('.dossier-card')?.querySelector('.dossier-answer'),item=questionItems[index];if(panel){panel.id='dossier-panel-'+index;panel.hidden=true;panel.setAttribute('aria-hidden','true');button.setAttribute('aria-controls',panel.id)}if(item?.kind==='Insight'&&item.evidence.length){const meta=document.createElement('span');const confidence=Number(item.score||0)>=.75?'high':Number(item.score||0)>=.45?'medium':'limited';meta.className='dossier-meta';meta.textContent=item.evidence.length+' excerpt'+(item.evidence.length===1?'':'s')+' · '+confidence+' confidence';button.querySelector('h3')?.after(meta)}button.addEventListener('click',()=>{const card=button.closest('.dossier-card'),wasOpen=card.classList.contains('open');document.querySelectorAll('.dossier-card').forEach(other=>{other.classList.remove('open');other.querySelector('.dossier-toggle')?.setAttribute('aria-expanded','false');const otherPanel=other.querySelector('.dossier-answer');if(otherPanel){otherPanel.hidden=true;otherPanel.setAttribute('aria-hidden','true')}});if(!wasOpen){card.classList.add('open');button.setAttribute('aria-expanded','true');if(panel){panel.hidden=false;panel.setAttribute('aria-hidden','false')}}})});
+    let dossierKind='insight';let showAllDossiers=false;const moreDossiers=document.createElement('button');moreDossiers.type='button';moreDossiers.className='dossier-more';document.querySelector('#findings .dossier-grid')?.after(moreDossiers);function renderDossierVisibility(){const cards=[...document.querySelectorAll('.dossier-card')],matches=cards.filter(card=>dossierKind==='all'||card.dataset.kind===dossierKind);cards.forEach(card=>{const index=matches.indexOf(card);card.hidden=index<0;card.classList.toggle('dossier-collapsed',index>=3&&!showAllDossiers)});moreDossiers.hidden=matches.length<=3;moreDossiers.textContent=showAllDossiers?'Show fewer findings ↑':'Show '+Math.max(0,matches.length-3)+' more findings →'}moreDossiers.addEventListener('click',()=>{showAllDossiers=!showAllDossiers;renderDossierVisibility()});
+    document.querySelectorAll('[data-dossier-kind]').forEach(button=>{button.setAttribute('role','tab');button.setAttribute('aria-selected',String(button.classList.contains('active')));button.addEventListener('click',()=>{document.querySelectorAll('[data-dossier-kind]').forEach(tab=>{const active=tab===button;tab.classList.toggle('active',active);tab.setAttribute('aria-pressed',String(active));tab.setAttribute('aria-selected',String(active))});dossierKind=button.dataset.dossierKind;showAllDossiers=false;document.querySelectorAll('.dossier-card').forEach(card=>{card.classList.remove('open');card.querySelector('.dossier-toggle')?.setAttribute('aria-expanded','false');const panel=card.querySelector('.dossier-answer');if(panel){panel.hidden=true;panel.setAttribute('aria-hidden','true')}});renderDossierVisibility()})});
+    renderDossierVisibility();
+    function chartMarkup(metrics){return '<nav class="chart-metrics">'+metrics.map((metric,index)=>'<button type="button" data-chart-metric="'+metric.key+'" class="'+(index===0?'active':'')+'">'+metric.label+'</button>').join('')+'</nav><div class="chart-rows"></div><div class="chart-detail"></div>'}
+    function mountChart(id,rows,metrics){const root=document.getElementById(id);root.innerHTML=chartMarkup(metrics);const render=key=>{const metric=metrics.find(item=>item.key===key)||metrics[0],sorted=[...rows].sort((a,b)=>Number(b[key]||0)-Number(a[key]||0)),max=Math.max(1,...sorted.map(item=>Number(item[key]||0)));root.querySelector('.chart-rows').innerHTML=sorted.map((item,index)=>'<button class="chart-row" data-chart-row="'+index+'" type="button"><span>'+esc(item.name)+'</span><span class="track"><span class="fill" style="width:'+Math.max(item[key]?3:0,Number(item[key]||0)/max*100)+'%"></span></span><b>'+esc(metric.format(item[key]))+'</b></button>').join('')||'<div class="empty">No data available.</div>';root.querySelectorAll('[data-chart-metric]').forEach(button=>button.classList.toggle('active',button.dataset.chartMetric===key));root.querySelector('.chart-detail').textContent='';root.querySelectorAll('[data-chart-row]').forEach(button=>button.addEventListener('click',()=>{const item=sorted[Number(button.dataset.chartRow)];root.querySelectorAll('[data-chart-row]').forEach(row=>row.classList.toggle('active',row===button));root.querySelector('.chart-detail').textContent=metrics.map(value=>value.label+': '+value.format(item[value.key])).join(' · ')}))};root.querySelectorAll('[data-chart-metric]').forEach(button=>button.addEventListener('click',()=>render(button.dataset.chartMetric)));render(metrics[0].key)}
+    const standardMetrics=[{key:'sessions',label:'Sessions',format:number},{key:'messages',label:'Messages',format:compact},{key:'friction',label:'Friction',format:number}];
+    mountChart('projects-chart',projectStats,standardMetrics);mountChart('agents-chart',agentStats,standardMetrics);mountChart('models-chart',modelStats,[{key:'tokens',label:'Tokens',format:compact}]);mountChart('tools-chart',toolStats,[{key:'calls',label:'Calls',format:compact}]);
+    function activateActivityTab(button){document.querySelectorAll('[data-activity]').forEach(tab=>{const active=tab===button;tab.classList.toggle('active',active);tab.setAttribute('aria-pressed',String(active));tab.setAttribute('aria-selected',String(active))});document.querySelectorAll('[data-view]').forEach(view=>{const active=view.dataset.view===button.dataset.activity;view.classList.toggle('active',active);view.setAttribute('aria-hidden',String(!active))})}
+    document.querySelectorAll('[data-activity]').forEach(button=>button.addEventListener('click',()=>activateActivityTab(button)));
+    document.querySelectorAll('[data-evidence]').forEach(button=>button.addEventListener('click',()=>{const open=!button.classList.contains('open');button.classList.toggle('open',open);button.setAttribute('aria-expanded',String(open))}));
+    function filterEvidence(query=''){const needle=String(query).trim().toLowerCase();let visible=0;document.querySelectorAll('[data-evidence]').forEach(row=>{const match=!needle||row.textContent.toLowerCase().includes(needle);row.hidden=!match;if(match)visible++});document.getElementById('result-count').textContent=visible+' / '+evidenceRecords.length;const empty=document.getElementById('evidence-empty');if(empty)empty.hidden=visible>0}
+    document.getElementById('evidence-search').addEventListener('input',event=>filterEvidence(event.target.value));
+    document.querySelectorAll('[data-evidence-query]').forEach(button=>button.addEventListener('click',()=>{showPage('evidence');const input=document.getElementById('evidence-search');input.value=button.dataset.evidenceQuery;filterEvidence(input.value);input.focus()}));
+    document.getElementById('print-report').addEventListener('click',()=>window.print());
+    document.getElementById('download-json')?.addEventListener('click',()=>{const url=URL.createObjectURL(new Blob([JSON.stringify(R,null,2)],{type:'application/json'})),link=document.createElement('a');link.href=url;link.download='farpoint-analysis.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000)});
+    filterEvidence();
+  </script>
+</body>
+</html>`;
 }

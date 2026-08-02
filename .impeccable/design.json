@@ -1,0 +1,205 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-01T23:02:15+05:30",
+  "title": "Design System: Farpoint",
+  "extensions": {
+    "colorMeta": {
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "#f0f1ed",
+        "tonalRamp": ["#171918", "#2a2d2b", "#414441", "#5a5e5a", "#747873", "#8e928d", "#a9ada7", "#f0f1ed"]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted",
+        "canonical": "#929692",
+        "tonalRamp": ["#161817", "#292c2a", "#414441", "#595d59", "#727671", "#929692", "#b0b4af", "#eef0eb"]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Line",
+        "canonical": "#292c2a",
+        "tonalRamp": ["#121413", "#1b1e1c", "#292c2a", "#3f433f", "#595d59", "#747873", "#969a95", "#d9ddd7"]
+      },
+      "accent": {
+        "role": "primary",
+        "displayName": "Signal Mint",
+        "canonical": "#84d7a0",
+        "tonalRamp": ["#0b2415", "#123c23", "#1d5b35", "#2d7c49", "#42a963", "#65c982", "#84d7a0", "#e7faeb"]
+      },
+      "accent-deep": {
+        "role": "primary",
+        "displayName": "Deep Fern",
+        "canonical": "#2c4a37",
+        "tonalRamp": ["#0c1810", "#14271b", "#1d3828", "#2c4a37", "#45634e", "#63816b", "#839e89", "#e5efe6"]
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Paper",
+        "canonical": "#101211",
+        "tonalRamp": ["#101211", "#171918", "#202321", "#2a2d2b", "#414441", "#5a5e5a", "#747873", "#f0f1ed"]
+      },
+      "sidebar": {
+        "role": "neutral",
+        "displayName": "Sidebar",
+        "canonical": "#0b0d0c",
+        "tonalRamp": ["#0b0d0c", "#121413", "#1a1c1b", "#242725", "#3b3f3b", "#555954", "#737771", "#eff2ed"]
+      },
+      "panel": {
+        "role": "neutral",
+        "displayName": "Panel",
+        "canonical": "#151816",
+        "tonalRamp": ["#151816", "#1e211f", "#292c2a", "#3f433f", "#595d59", "#747873", "#969a95", "#f0f1ed"]
+      },
+      "card": {
+        "role": "neutral",
+        "displayName": "Card",
+        "canonical": "#141715",
+        "tonalRamp": ["#141715", "#1d201e", "#282b29", "#3e423e", "#585c58", "#737771", "#959995", "#eff1ec"]
+      },
+      "button-surface": {
+        "role": "neutral",
+        "displayName": "Button Surface",
+        "canonical": "#191c1a",
+        "tonalRamp": ["#191c1a", "#222522", "#2d302e", "#444844", "#5d615d", "#777b76", "#989c97", "#f1f3ee"]
+      },
+      "primary-surface": {
+        "role": "primary",
+        "displayName": "Primary Surface",
+        "canonical": "#e7e8e3",
+        "tonalRamp": ["#171918", "#2a2d2b", "#414441", "#5a5e5a", "#747873", "#8e928d", "#a9ada7", "#e7e8e3"]
+      },
+      "chart-track": {
+        "role": "neutral",
+        "displayName": "Chart Track",
+        "canonical": "#282b29",
+        "tonalRamp": ["#141615", "#1d201e", "#282b29", "#3e423e", "#585c58", "#737771", "#959995", "#eff1ec"]
+      },
+      "chart-fill": {
+        "role": "neutral",
+        "displayName": "Chart Fill",
+        "canonical": "#b8bbb6",
+        "tonalRamp": ["#202220", "#343734", "#4b4f4b", "#646864", "#7e827d", "#989c97", "#b8bbb6", "#f1f3ee"]
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Report Display", "purpose": "Welcome and recommendation statements." },
+      "headline": { "displayName": "Section Headline", "purpose": "Findings, activity, and evidence section titles." },
+      "title": { "displayName": "Dossier Title", "purpose": "Profile identity and dossier header." },
+      "body": { "displayName": "Report Body", "purpose": "Explanations and focus copy." },
+      "label": { "displayName": "Interface Label", "purpose": "Eyebrows, kickers, metric headings, and actions." },
+      "mono": { "displayName": "Data Mono", "purpose": "Counts, ordinals, values, and technical metadata." }
+    },
+    "shadows": [],
+    "motion": [
+      { "name": "state", "value": "0.15s ease", "purpose": "Small hover, border, and color changes on controls." },
+      { "name": "page-entry", "value": "0.28s cubic-bezier(.2,.75,.25,1)", "purpose": "Subtle vertical entry for report pages." },
+      { "name": "expand", "value": "0.24s ease", "purpose": "Expand dossier and FAQ answers in place." },
+      { "name": "reduced-motion", "value": "none", "purpose": "Disable animation and transitions when the user requests reduced motion." }
+    ],
+    "breakpoints": [
+      { "name": "compact-grid", "value": "900px" },
+      { "name": "mobile-rail", "value": "700px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "High-contrast next-step action used to advance through the report.",
+      "html": "<button class=\"ds-btn-primary\" type=\"button\">Next <span aria-hidden=\"true\">→</span></button>",
+      "css": ".ds-btn-primary { min-height:42px; display:inline-flex; align-items:center; justify-content:center; gap:12px; padding:0 15px; border:1px solid #e7e8e3; border-radius:7px; background:#e7e8e3; color:#121413; cursor:pointer; font:650 13px 'Instrument Sans',sans-serif; transition:transform .17s ease, filter .17s ease, outline .17s ease; } .ds-btn-primary:hover { transform:translateY(-1px); filter:brightness(1.06); } .ds-btn-primary:focus-visible { outline:2px solid #84d7a0; outline-offset:3px; } .ds-btn-primary:active { transform:none; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Quiet companion action for navigation and secondary choices.",
+      "html": "<button class=\"ds-btn-secondary\" type=\"button\">Previous <span aria-hidden=\"true\">←</span></button>",
+      "css": ".ds-btn-secondary { min-height:42px; display:inline-flex; align-items:center; justify-content:center; gap:12px; padding:0 15px; border:1px solid #393d3a; border-radius:7px; background:#191c1a; color:#ced0cc; cursor:pointer; font:600 13px 'Instrument Sans',sans-serif; transition:transform .17s ease, border-color .17s ease, color .17s ease, outline .17s ease; } .ds-btn-secondary:hover { transform:translateY(-1px); border-color:#646964; color:#fff; } .ds-btn-secondary:focus-visible { outline:2px solid #84d7a0; outline-offset:3px; } .ds-btn-secondary:active { transform:none; }"
+    },
+    {
+      "name": "Active Filter Chip",
+      "kind": "chip",
+      "refersTo": "filter-chip-active",
+      "description": "Selected state for dossier, activity, and chart view filters.",
+      "html": "<button class=\"ds-chip\" type=\"button\" aria-pressed=\"true\">Insights (4)</button>",
+      "css": ".ds-chip { padding:8px 16px; border:1px solid #2c4a37; border-radius:20px; background:#2c4a37; color:#e9fbef; cursor:pointer; font:560 13px 'Instrument Sans',sans-serif; transition:border-color .15s ease, color .15s ease, outline .15s ease; } .ds-chip:hover { border-color:#84d7a0; } .ds-chip:focus-visible { outline:2px solid #84d7a0; outline-offset:3px; }"
+    },
+    {
+      "name": "Evidence Search",
+      "kind": "input",
+      "refersTo": "search-input",
+      "description": "Searches the evidence ledger without leaving the report.",
+      "html": "<input class=\"ds-search\" type=\"search\" aria-label=\"Search evidence\" placeholder=\"Search evidence, sessions, projects…\">",
+      "css": ".ds-search { width:100%; min-height:44px; padding:0 14px; border:1px solid #353936; border-radius:7px; background:#151816; color:#f0f1ed; font:400 13px 'Instrument Sans',sans-serif; transition:border-color .15s ease, outline .15s ease; } .ds-search::placeholder { color:#666b67; } .ds-search:focus-visible { outline:2px solid #84d7a0; outline-offset:3px; border-color:#84d7a0; }"
+    },
+    {
+      "name": "Sidebar Navigation Item",
+      "kind": "nav",
+      "refersTo": "nav-item",
+      "description": "Step navigation for the guided report sequence.",
+      "html": "<button class=\"ds-nav-item is-active\" type=\"button\"><span>Findings</span></button>",
+      "css": ".ds-nav-item { display:block; width:100%; min-height:44px; padding:11px 14px; text-align:left; border:1px solid transparent; border-left:2px solid transparent; border-radius:6px; background:transparent; color:#7d817d; cursor:pointer; font:400 13.5px 'Instrument Sans',sans-serif; transition:background .16s ease, color .16s ease, outline .16s ease; } .ds-nav-item:hover { color:#c5c8c3; background:#151816; } .ds-nav-item.is-active { color:#f0f1ed; font-weight:560; border-left-color:#84d7a0; background:#151816; } .ds-nav-item:focus-visible { outline:2px solid #84d7a0; outline-offset:3px; }"
+    },
+    {
+      "name": "Dossier Card",
+      "kind": "card",
+      "refersTo": "dossier-card",
+      "description": "Expandable finding that keeps observation, action, and evidence together.",
+      "html": "<article class=\"ds-dossier-card\"><button class=\"ds-dossier-toggle\" type=\"button\" aria-expanded=\"false\"><span class=\"ds-dossier-kicker\">Insight</span><strong>Verify the result, not just the process.</strong></button></article>",
+      "css": ".ds-dossier-card { overflow:hidden; border:1px solid #292c2a; border-radius:7px; background:#141715; transition:border-color .15s ease; } .ds-dossier-card:hover { border-color:#3a3e3b; } .ds-dossier-toggle { width:100%; padding:18px 20px; text-align:left; border:0; background:transparent; color:#e7e8e4; cursor:pointer; font:540 17px/1.32 'Instrument Sans',sans-serif; transition:outline .15s ease; } .ds-dossier-toggle:focus-visible { outline:2px solid #84d7a0; outline-offset:-3px; } .ds-dossier-kicker { display:block; margin-bottom:8px; color:#8a8e89; font:600 12px/1.2 'Instrument Sans',sans-serif; }"
+    },
+    {
+      "name": "Metric Group",
+      "kind": "card",
+      "refersTo": "metric-group",
+      "description": "Compact tonal container for archive and session measurements.",
+      "html": "<section class=\"ds-metric-group\"><h2>Totals</h2><div class=\"ds-metric-row\"><span>Sessions</span><b>128</b></div></section>",
+      "css": ".ds-metric-group { overflow:hidden; border:1px solid #292c2a; border-radius:8px; background:#151816; color:#f0f1ed; } .ds-metric-group h2 { margin:0; padding:14px 16px; border-bottom:1px solid #292c2a; color:#b7bab6; font:600 13px 'Instrument Sans',sans-serif; } .ds-metric-row { display:flex; justify-content:space-between; gap:24px; padding:10px 16px; border-bottom:1px solid #242725; font:400 12px 'Instrument Sans',sans-serif; } .ds-metric-row:last-child { border-bottom:0; } .ds-metric-row span { color:#898d89; } .ds-metric-row b { color:#f0f1ed; font:500 11px 'DM Mono',monospace; }"
+    },
+    {
+      "name": "Evidence Row",
+      "kind": "custom",
+      "refersTo": "evidence-row",
+      "description": "Search result row that expands to reveal the original excerpt.",
+      "html": "<button class=\"ds-evidence-row\" type=\"button\" aria-expanded=\"false\"><strong>Session in farpoint</strong><span>project · agent · turn 12</span></button>",
+      "css": ".ds-evidence-row { display:block; width:100%; padding:15px 17px; border:0; background:#141715; color:#f0f1ed; text-align:left; cursor:pointer; transition:background .15s ease, outline .15s ease; } .ds-evidence-row:hover { background:#191c1a; } .ds-evidence-row:focus-visible { outline:2px solid #84d7a0; outline-offset:-3px; } .ds-evidence-row strong { display:block; margin-bottom:5px; font:520 14px/1.35 'Instrument Sans',sans-serif; } .ds-evidence-row span { color:#777c77; font:400 11px 'Instrument Sans',sans-serif; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Evidence Ledger",
+    "overview": "Farpoint's visual system is a dark evidence ledger: quiet, exacting, and generous with the data. The local report stages conclusions as a guided sequence—recommendation first, then findings, activity, and evidence—so it feels like an instrument for review rather than a generic dashboard. Mint is a signal for direction, confidence, and interaction; it is deliberately rare against the dark field.\n\nThe surface is built from near-black tonal layers, hairline borders, restrained radii, and a compact sans/mono pairing. Instrument Sans gives conclusions an editorial, human voice; DM Mono is reserved for measurements, ordinals, and technical metadata. The terminal companion keeps the same green-led intent with an Ink-native palette and text-first controls.",
+    "keyCharacteristics": [
+      "Evidence before ornament: data and supporting excerpts remain the visual focus.",
+      "Dark, layered, and local: surfaces distinguish context without relying on heavy shadows.",
+      "Signal-led interaction: mint marks active navigation, links, selected states, and progress.",
+      "Editorial data density: large, tightly set headings sit above compact labels and metrics."
+    ],
+    "rules": [
+      { "name": "The Signal Scarcity Rule", "body": "Mint should identify what is active, actionable, or verified; it should not become a general-purpose background color.", "section": "colors" },
+      { "name": "The Tonal Layer Rule", "body": "Separate report surfaces with nearby dark values and hairlines before reaching for additional accent colors.", "section": "colors" },
+      { "name": "The Two-Register Rule", "body": "Use Instrument Sans for meaning and DM Mono for measurement. Do not set explanatory paragraphs in mono.", "section": "typography" },
+      { "name": "The Tight Headline Rule", "body": "Large headings use compressed tracking and short line-height; supporting prose restores generous line-height and muted contrast.", "section": "typography" },
+      { "name": "The Flat Ledger Rule", "body": "A surface is flat at rest. Use tonal layering and borders to establish hierarchy; reserve movement and emphasis for interaction or evidence state.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do lead report journeys with one concrete next move before exposing the full archive.",
+      "Do keep recommendations, findings, metrics, and evidence visually related but distinguishable through tonal layers.",
+      "Do use mint for active, actionable, or verified states and maintain a visible focus treatment.",
+      "Do reserve DM Mono for values, ordinals, and compact technical metadata.",
+      "Do preserve the 900–1080px reading widths for dense report content and stack the system at the documented breakpoints.",
+      "Do keep the report local-first and evidence-forward in any new surface language."
+    ],
+    "donts": [
+      "Don't turn the report into a colorful analytics dashboard with a new accent for every metric.",
+      "Don't use shadows, glow, or decorative imagery to manufacture hierarchy that tonal layers already provide.",
+      "Don't hide supporting evidence behind vague claims or replace evidence labels with raw session IDs.",
+      "Don't use the terminal palette as if it were the web report palette; the surfaces have intentionally distinct values.",
+      "Don't set body copy, recommendations, or explanatory findings in DM Mono.",
+      "Don't remove keyboard focus, reduced-motion behavior, or the compact mobile navigation treatment."
+    ]
+  }
+}

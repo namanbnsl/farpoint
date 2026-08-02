@@ -29,6 +29,24 @@ pnpm pack:dry  # inspect the npm package contents
 
 Vite+ configuration lives in `vite.config.ts`. Keep build, lint, and type-checking behavior there where possible, and avoid adding overlapping standalone tooling without a clear need.
 
+## Report development
+
+Use the standalone renderer to iterate on the HTML report without running the CLI, indexing sessions, or calling a model. Put a schema-version-1 report payload at `analysis.json` in the repository root, then run:
+
+```bash
+./scripts/render-report.mjs
+```
+
+The script reads `analysis.json` and writes `report.html` in the repository root. Both files are gitignored and may contain sensitive session data; keep them local and do not commit or share them.
+
+You can also provide explicit input and output paths:
+
+```bash
+./scripts/render-report.mjs path/to/analysis.json path/to/report.html
+```
+
+After changing `src/report/html.ts`, rerun the script and inspect the generated HTML in a browser. This workflow exercises only the report renderer and must not be wired into or used to modify the CLI flow.
+
 For each change:
 
 1. Understand the affected user flow and keep the change narrowly scoped.
