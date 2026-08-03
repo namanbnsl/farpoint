@@ -8,10 +8,26 @@ export default defineConfig({
     sourcemap: true,
   },
   lint: {
+    ignorePatterns: [
+      ".agents/skills/impeccable/**",
+      ".claude/skills/impeccable/**",
+      ".impeccable/**",
+      "PRODUCT.md",
+      "DESIGN.md",
+    ],
     plugins: ["typescript"],
     options: {
       typeAware: true,
       typeCheck: true,
     },
+  },
+  fmt: {
+    ignorePatterns: [
+      ".agents/skills/impeccable/**",
+      ".claude/skills/impeccable/**",
+      ".impeccable/**",
+      "PRODUCT.md",
+      "DESIGN.md",
+    ],
   },
 });
